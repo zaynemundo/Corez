@@ -256,17 +256,17 @@ check 'the open header keeps the Corez wordmark' 'brand-wordmark' "$sidebar"
 check 'the rail carries the Corez mark' 'sidebar-rail-logo' "$sidebar"
 check_absent 'the Sites row no longer uses the globe glyph' 'Globe' "$sidebar"
 check 'the Sites rows use the four-box glyph' 'LayoutGrid' "$sidebar"
-check_absent 'the rail has no quick find action' 'sidebar-rail-search-btn' "$sidebar"
+check 'the rail opens quick find' 'sidebar-rail-search-btn' "$sidebar"
+check_absent 'quick find does not sit in the open Recents heading' 'sidebar-section-search' "$sidebar"
+check 'quick find searches only the visible chat list' 'sessions.filter' "$sidebar"
 check 'the rail lights New Chat only on the chat screen' 'activeView === "chat"' "$sidebar"
-check_absent 'the rail has no recents action' 'railChats' "$sidebar"
-check_absent 'the rail has no account control' 'SidebarRailProfile' "$sidebar"
-check 'the panel restores New Chat' 'className="new-chat-btn"' "$sidebar"
-check 'the panel owns the account footer' 'sidebar-footer' "$sidebar"
+check 'the rail offers recents' 'common.sidebar.chats' "$sidebar"
+check 'the rail account control opens settings' 'SidebarRailProfile' "$sidebar"
 check_block_property_in_media 'a phone drawer hides the desktop rail' 'max-width: 767px' '.sidebar.collapsed .sidebar-rail' 'display' 'none'
 check 'the floating sidebar toggle is phone-only' '!sidebarOpen && isMobileViewport' "$app"
 
 # Project folders: the add control is a hover affordance of the Projects
-# heading, not a permanent button — and it must still be reachable on touch
+# heading, not a permanent button â€” and it must still be reachable on touch
 # devices and by keyboard. Menus and the list itself must not fight scrolling.
 check_block_property 'projects add button is hidden until its heading is hovered' '.sidebar-section-add' 'opacity' '0;'
 check_block_property 'projects add button is revealed on heading hover' '.sidebar-section-row:hover .sidebar-section-add' 'opacity' '0.65'

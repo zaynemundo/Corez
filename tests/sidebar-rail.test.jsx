@@ -1,10 +1,17 @@
 // @vitest-environment jsdom
 //
-// The desktop sidebar keeps a two-action navigation rail (New Chat and Sites)
-// beside the full panel. The panel owns search, recents, and the account
-// footer; these tests pin that split.
+// The closed desktop sidebar is a navigation rail, not an empty column: brand,
+// new chat, Sites, quick find, recents and the account all remain reachable.
+// The full panel stays mounted behind it for its state, so these tests pin the
+// surface split as well as every rail action.
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { render, within, cleanup } from "@testing-library/react";
+import {
+  render,
+  screen,
+  within,
+  cleanup,
+  waitFor,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import Sidebar from "../src/components/Sidebar.jsx";
 import { I18nProvider } from "../src/i18n/index.jsx";
@@ -60,31 +67,33 @@ describe("closed sidebar navigation rail", () => {
     await user.click(railQueries.getByRole("button", { name: "Open Sidebar" }));
     expect(handlers.onOpenSidebar).toHaveBeenCalledTimes(1);
 
-    await user.click(
-      railQueries.getByRole("button", { name: "Start a new chat" }),
-    );
+    await user.click(railQueries.getByRole("button", { name: "New Chat" }));
     expect(handlers.onNewChat).toHaveBeenCalledTimes(1);
 
-    await user.click(
-      railQueries.getByRole("button", { name: "Published sites" }),
-    );
+    await user.click(railQueries.getByRole("button", { name: "Recents" }));
+    expect(handlers.onOpenSidebar).toHaveBeenCalledTimes(2);
+
+    await user.click(railQueries.getByRole("button", { name: "Sites" }));
     expect(handlers.onOpenSites).toHaveBeenCalledTimes(1);
+
+    await user.click(
+      railQueries.getByRole("button", { name: "Open settings" }),
+    );
+    expect(handlers.onOpenSettings).toHaveBeenCalledTimes(1);
   });
 
   it("marks the rail's Sites destination while that screen is open", () => {
     const { railQueries } = renderRail({ activeView: "sites" });
 
-    const sites = railQueries.getByRole("button", { name: "Published sites" });
+    const sites = railQueries.getByRole("button", { name: "Sites" });
     expect(sites.getAttribute("aria-current")).toBe("page");
     expect(sites.className).toContain("is-active");
 
-    const newChat = railQueries.getByRole("button", {
-      name: "Start a new chat",
-    });
+    const newChat = railQueries.getByRole("button", { name: "New Chat" });
     expect(newChat.className).not.toContain("sidebar-rail-action-primary");
   });
 
-  it("exposes exactly New Chat and Sites in the rail", () => {
+  it("places Sites above quick find in the rail", () => {
     const { railQueries } = renderRail();
     const nav = railQueries.getByRole("navigation", {
       name: "Primary navigation",
@@ -93,25 +102,105 @@ describe("closed sidebar navigation rail", () => {
       .getAllByRole("button")
       .map((button) => button.getAttribute("aria-label"));
 
-    expect(labels).toEqual(["Start a new chat", "Published sites"]);
+    expect(labels).toEqual(["New Chat", "Sites", "Search chats", "Recents"]);
   });
 
-  it("keeps the rail available when the full panel is open", async () => {
+  it("uses the rail's quick find, then opens the chosen one", async () => {
     const user = userEvent.setup();
-    const { handlers, rail, railQueries } = renderRail({ isOpen: true });
+    const { handlers, railQueries } = renderRail();
 
-    expect(rail.getAttribute("aria-hidden")).not.toBe("true");
+    const trigger = railQueries.getByRole("button", { name: "Search chats" });
+    await user.click(trigger);
+
+    const dialog = screen.getByRole("dialog", { name: "Search chats" });
+    const input = within(dialog).getByRole("searchbox", {
+      name: "Search your chats",
+    });
+    expect(document.activeElement).toBe(input);
+
+    await user.type(input, "kyoto");
     expect(
-      railQueries.getByRole("navigation", { name: "Primary navigation" }),
+      within(dialog).getByRole("button", { name: /Kyoto/ }),
     ).toBeTruthy();
+    expect(
+      within(dialog).queryByRole("button", { name: /analytics/ }),
+    ).toBeNull();
+
+    await user.click(within(dialog).getByRole("button", { name: /Kyoto/ }));
+    expect(handlers.onSelectSession).toHaveBeenCalledWith("chat-2");
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog")).toBeNull();
+    });
+  });
+
+  it("opens the first match with Enter", async () => {
+    const user = userEvent.setup();
+    const { handlers, railQueries } = renderRail();
+
+    await user.click(
+      railQueries.getByRole("button", { name: "Search chats" }),
+    );
+    const dialog = screen.getByRole("dialog", { name: "Search chats" });
+    await user.type(
+      within(dialog).getByRole("searchbox", { name: "Search your chats" }),
+      "kyoto{Enter}",
+    );
+
+    expect(handlers.onSelectSession).toHaveBeenCalledWith("chat-2");
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("reports an empty search instead of an empty panel", async () => {
+    const user = userEvent.setup();
+    const { railQueries } = renderRail();
+
+    await user.click(
+      railQueries.getByRole("button", { name: "Search chats" }),
+    );
+    const dialog = screen.getByRole("dialog", { name: "Search chats" });
+    await user.type(
+      within(dialog).getByRole("searchbox", { name: "Search your chats" }),
+      "no-such-chat",
+    );
+
+    expect(within(dialog).getByRole("status").textContent).toContain(
+      "No chats found",
+    );
+  });
+
+  it("closes quick find on Escape and returns focus to its trigger", async () => {
+    const user = userEvent.setup();
+    const { railQueries } = renderRail();
+
+    const trigger = railQueries.getByRole("button", { name: "Search chats" });
+    await user.click(trigger);
+    const dialog = screen.getByRole("dialog", { name: "Search chats" });
+    const input = within(dialog).getByRole("searchbox", {
+      name: "Search your chats",
+    });
+    await user.type(input, "design");
+    await user.keyboard("{Escape}");
+
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(document.activeElement).toBe(trigger);
+  });
+
+  it("hides the rail from assistive tech once the full panel is open", () => {
+    const { handlers } = renderRail({ isOpen: true });
+
+    const rail = document.querySelector(".sidebar-rail");
+    expect(rail.getAttribute("aria-hidden")).toBe("true");
+    expect(
+      screen.queryByRole("navigation", { name: "Primary navigation" }),
+    ).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: "Open Sidebar" }),
+    ).toBeNull();
     expect(document.querySelector(".sidebar-full").getAttribute("aria-hidden")).toBe(
       null,
     );
-
-    // The rail brand is also the panel's collapse control while it is open.
-    await user.click(
-      railQueries.getByRole("button", { name: "Toggle sidebar" }),
-    );
-    expect(handlers.onCloseSidebar).toHaveBeenCalledTimes(1);
+    // The compact rail is not the full panel's close control: opening remains
+    // the app's concern.
+    expect(handlers.onCloseSidebar).not.toHaveBeenCalled();
   });
 });

@@ -2,7 +2,7 @@
 
 :root,
 [data-theme="dark"] {
-  /* Deep monochrome palette — the shell is pure black, so the sidebar and the
+  /* Deep monochrome palette â€” the shell is pure black, so the sidebar and the
      reading pane read as one continuous surface. Raised surfaces step up one
      neutral tone at a time (secondary < tertiary) instead of carrying a tint. */
   --bg-primary: #000000;
@@ -33,7 +33,7 @@
   --selection-color: #f0f0f0;
   --inline-code-color: #f1fa8c;
 
-  /* Primary composer action — the filled circle that sends the message. Corez
+  /* Primary composer action â€” the filled circle that sends the message. Corez
      is a monochrome system, so the action is the page's BRIGHTEST surface
      rather than a coloured one: ~19:1 against the black page, and the dark glyph
      on it is the same figure inverted. */
@@ -81,7 +81,7 @@
   --transition-fast: 0.15s cubic-bezier(0.16, 1, 0.3, 1);
   --transition-normal: 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 
-  /* Layering map — the canonical stacking order, declared once and referenced
+  /* Layering map â€” the canonical stacking order, declared once and referenced
      by every positioned element instead of ad-hoc integers. Reading order is
      the paint order: a layer may only sit above the ones before it.
        0   background      page backdrop
@@ -120,7 +120,7 @@
 }
 
 [data-theme="light"] {
-  /* Softened Light Neutral Palette — the page rests on a neutral off-white
+  /* Softened Light Neutral Palette â€” the page rests on a neutral off-white
      (#f7f7f7) instead of pure white, so a full-screen view no longer glares.
      Raised surfaces (composer, menus, cards) stay pure white and lift off the
      page by tone plus border, and near-black text replaces the harsh #000. */
@@ -311,7 +311,7 @@ h6 {
 }
 
 /* Fully Rounded Sidebar Elements */
-/* Language row (Settings → General). The control is a native <select> so the
+/* Language row (Settings â†’ General). The control is a native <select> so the
    browser handles the picker and the option list stays readable in both
    directions. */
 .settings-language-row {
@@ -436,36 +436,6 @@ h6 {
 .sidebar.collapsed .sidebar-rail {
   display: flex;
   visibility: visible;
-}
-
-/* On desktop the icon rail is permanent: the full panel opens beside it
-   instead of replacing it, and collapsing hides only the panel. */
-@media (min-width: 768px) {
-  .sidebar:not(.collapsed) {
-    width: calc(var(--sidebar-width) + var(--sidebar-rail-width));
-  }
-
-  .sidebar-full {
-    inset-inline-start: var(--sidebar-rail-width);
-    width: var(--sidebar-width);
-  }
-
-  .sidebar-rail {
-    display: flex;
-  }
-
-  /* A hairline separates the permanent rail from the panel without boxing the
-     whole shell in. */
-  .sidebar:not(.collapsed) .sidebar-rail {
-    border-inline-end: 1px solid var(--sidebar-border);
-  }
-
-  /* The rail owns Sites permanently. The panel brings New Chat back, but a
-     second Sites button would be a duplicate on desktop; phones keep it
-     because the rail is hidden there. */
-  .sidebar:not(.collapsed) .sidebar-action-box .sites-nav-btn {
-    display: none;
-  }
 }
 
 .sidebar-rail-top {
@@ -1119,7 +1089,7 @@ h6 {
 .history-menu-dropdown {
   position: fixed;
   z-index: var(--z-sidebar-mobile);
-  /* One fixed width for every row menu — the chat menu, the project menu and
+  /* One fixed width for every row menu â€” the chat menu, the project menu and
      the move-to-project list all paint the same panel, so the dropdown never
      changes size with its contents. */
   width: 200px;
@@ -1179,8 +1149,8 @@ h6 {
   margin-top: var(--sidebar-section-gap);
 }
 
-/* The add control appears when the section's own row is hovered — it is the
-   Projects heading's action, not a sidebar-wide button — and is always shown
+/* The add control appears when the section's own row is hovered â€” it is the
+   Projects heading's action, not a sidebar-wide button â€” and is always shown
    for keyboard focus. Touch devices never hover, so there it is always
    visible. */
 .sidebar-section-add {
@@ -1256,8 +1226,8 @@ h6 {
 }
 
 /* Drag and drop. The dragged row dims; a between-rows drop shows as a hairline
-   above (drop-before) or below (drop-after) the hovered row; a folder — or the
-   whole Pinned section — about to receive the chat fills with the hover tone
+   above (drop-before) or below (drop-after) the hovered row; a folder â€” or the
+   whole Pinned section â€” about to receive the chat fills with the hover tone
    and a dashed edge. The hairlines are pseudo-elements so they never shift
    the layout, and their offsets are symmetric so RTL needs no override. */
 .history-item.dragging {
@@ -1761,7 +1731,7 @@ h6 {
   color: var(--text-secondary);
 }
 
-/* The suggestion list: one roomy row per command — outline icon, label, and the
+/* The suggestion list: one roomy row per command â€” outline icon, label, and the
    command the row inserts in the monospace face at the far end. A row is a quiet
    line of text until it is hovered, which is what makes the list read as
    "things you could start with" rather than another panel of controls. */
@@ -2219,7 +2189,7 @@ h6 {
   font-weight: 600;
 }
 
-/* Accent-colored bold lead-ins: "- **Item name** — description." */
+/* Accent-colored bold lead-ins: "- **Item name** â€” description." */
 .markdown-list-item > strong:first-child {
   color: var(--text-primary);
   font-weight: 600;
@@ -2885,7 +2855,7 @@ h6 {
 }
 
 /* Live status while the model works and no reasoning has streamed yet
-   ("Working…"). Replaced by the reasoning text the moment it arrives; a soft
+   ("Workingâ€¦"). Replaced by the reasoning text the moment it arrives; a soft
    pulse keeps the header visibly alive during that wait. */
 .thinking-panel-status {
   color: var(--text-secondary);
@@ -3448,7 +3418,7 @@ h6 {
 }
 
 /* Ready to send: the composer's primary action is the brightest surface on the
-   page — monochrome, like everything else in the system. An empty composer
+   page â€” monochrome, like everything else in the system. An empty composer
    stays a quiet outline circle, so the fill itself says whether there is
    anything to send. */
 .send-btn:not(:disabled):not(.stop-btn) {
@@ -3737,7 +3707,7 @@ h6 {
   z-index: var(--z-content);
   /* Never shrink: this wrapper is a flex item of the dialog body, and because
      overflow-x: auto makes it a scroll container its automatic minimum height
-     is zero — without flex: none a long published-pages list squeezes it down
+     is zero â€” without flex: none a long published-pages list squeezes it down
      to its padding (16px) and the tabs end up in an invisible nested scroller
      instead of on screen. */
   flex: 0 0 auto;
@@ -3797,7 +3767,7 @@ h6 {
 }
 
 /* `.settings-panel` sets display: flex, which would beat the user agent's
-   [hidden] rule — inactive categories must not be visible. */
+   [hidden] rule â€” inactive categories must not be visible. */
 .settings-panel[hidden] {
   display: none;
 }
@@ -3967,7 +3937,7 @@ h6 {
   border-color: rgba(239, 68, 68, 0.32);
 }
 
-/* Pricing — Premium 3-Card (Settings → Plan & Billing) */
+/* Pricing â€” Premium 3-Card (Settings â†’ Plan & Billing) */
 .pricing-section {
   gap: 0.85rem;
 }
@@ -4412,7 +4382,7 @@ h6 {
   }
 }
 
-/* Pricing Page — ChatGPT-inspired */
+/* Pricing Page â€” ChatGPT-inspired */
 .pricing-page {
   width: 100%;
   min-height: 100vh;
@@ -4679,7 +4649,7 @@ h6 {
 [data-theme="light"] .pricing-card-page--premium {
   background: #ffffff;
 }
-/* Light mode: pale gold (#f1fa8c) is unreadable on white cards — use a
+/* Light mode: pale gold (#f1fa8c) is unreadable on white cards â€” use a
    deep gold instead (matches --inline-code-color in light mode). */
 [data-theme="light"] .pricing-card--premium .pricing-card-icon,
 [data-theme="light"] .pricing-card-page--premium .pricing-card-page-icon {
@@ -5524,7 +5494,7 @@ h6 {
     max-width: 100%;
   }
 
-  /* Pricing — mobile: prevent overflow, tighten spacing, handle safe areas */
+  /* Pricing â€” mobile: prevent overflow, tighten spacing, handle safe areas */
   .pricing-header {
     padding: 12px 16px 16px;
     padding-top: calc(12px + env(safe-area-inset-top, 0px));
@@ -5657,7 +5627,7 @@ h6 {
   .thinking-dot {
     animation: none !important;
   }
-  /* The live "Working…" status must not pulse either; the text stays. */
+  /* The live "Workingâ€¦" status must not pulse either; the text stays. */
   .thinking-panel-status {
     animation: none !important;
     opacity: 0.75;
@@ -6761,7 +6731,7 @@ h6 {
 .auth-loading {
   min-height: 100vh;
   /* #root is a flex row, so without an explicit width this screen shrank to
-     its own content (161px of "Loading Corez…") and sat against the left edge
+     its own content (161px of "Loading Corezâ€¦") and sat against the left edge
      with its centring applied inside that sliver. The other full-page screens
      all declare their own width; this one was missing it. */
   width: 100%;
@@ -6857,7 +6827,7 @@ h6 {
   pointer-events: none;
 }
 /* The scrim has to follow the theme, not the picture: a dark gradient under
-   light-theme text (#000 on white surfaces) left the sign-in page unreadable —
+   light-theme text (#000 on white surfaces) left the sign-in page unreadable â€”
    the card is transparent, so the document text sat straight on a darkened
    photo. Light theme brightens the backdrop instead of dimming it. */
 [data-theme="light"] .auth-bg {
