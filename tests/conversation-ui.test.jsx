@@ -87,6 +87,18 @@ describe('conversation UI', () => {
     expect(within(container).queryByText('No conversations yet')).toBeNull();
   });
 
+  it('offers deletion for a conversation from its Messages row', async () => {
+    const user = userEvent.setup();
+    const handlers = renderSidebar();
+    await user.click(
+      within(handlers.container).getByRole('button', {
+        name: 'Options for Studio lighting',
+      }),
+    );
+    await user.click(screen.getByRole('menuitem', { name: 'Delete' }));
+    expect(handlers.onDeleteSession).toHaveBeenCalledWith('conversation-1');
+  });
+
   it('renders named AI bubbles for a conversation message', () => {
     render(
       <I18nProvider>

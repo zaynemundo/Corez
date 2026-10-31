@@ -9254,6 +9254,27 @@ body.corez-consent-visible .app-container {
 .sidebar-message-row.active {
   background: var(--sidebar-item-hover-bg);
 }
+.sidebar-message-options {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  flex: 0 0 22px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  opacity: 0.55;
+  cursor: pointer;
+}
+.sidebar-message-row:hover .sidebar-message-options,
+.sidebar-message-options:focus-visible,
+.sidebar-message-options[aria-expanded="true"] {
+  color: var(--text-primary);
+  opacity: 1;
+}
 .sidebar-message-avatar {
   display: inline-flex;
   align-items: center;
