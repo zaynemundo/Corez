@@ -377,8 +377,12 @@ export async function runProviderChain(messages, options = {}) {
           ? Number(result.failure.status)
           : lastErrorStatus;
 
-      if (cls.kind === "permanent") {
-        // Authentication, validation, unsupported-model etc.: never retried.
+      const endpointUnavailable =
+        Number(result.failure?.status) === 503 &&
+        /Endpoint is unavailable/i.test(String(result.failure?.message || ""));
+      if (cls.kind === "permanent" || endpointUnavailable) {
+        // Authentication, validation, unsupported-model, and an upstream
+        // endpoint the gateway itself declares unavailable: never retried.
         if (store) {
           try {
             await clearRetrySchedule(store, retryKey, taskId);
@@ -654,8 +658,17 @@ export function runStreamingChain(messages, options = {}) {
           }
           // Permanent failures (auth, validation, bad model) are never
           // retried; partial streams cannot resume without duplicating
-          // content already sent to the client.
-          if (cls.kind !== "transient" || streamedChars > 0) {
+          // content already sent to the client. A gateway 503 that explicitly
+          // says the upstream endpoint is unavailable is also fail-fast so a
+          // model fallback can answer instead of retrying a dead endpoint.
+          const endpointUnavailable =
+            Number(failure?.status) === 503 &&
+            /Endpoint is unavailable/i.test(String(failure?.message || ""));
+          if (
+            endpointUnavailable ||
+            cls.kind !== "transient" ||
+            streamedChars > 0
+          ) {
             break;
           }
           // Transient blip (429 rate limit, 5xx, network): back off on the

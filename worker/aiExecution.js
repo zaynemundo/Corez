@@ -135,7 +135,9 @@ export function runStreamingAiExecution({
     signal: clientDisconnectSignal,
     sleep: retrySleepFor(env),
     sessionId,
-    model: selectedModel,
+    // Do not pin the primary model here: providerChain already carries the
+    // primary and approved fallback model on each entry. A caller-level model
+    // override would force a DeepSeek retry even on the Muse fallback entry.
     reasoning: withVisibleReasoning(selectedReasoning.reasoning),
     temperature: selectedReasoning.temperature,
   };
@@ -167,8 +169,9 @@ export function runStreamingAiExecution({
             inputTokens = event.inputTokens ?? inputTokens;
             outputTokens = event.outputTokens ?? outputTokens;
           } else if (event.type === "done") {
-            providerId = providerId || event.provider || null;
-            providerModel = providerModel || event.model || null;
+            // The final successful provider wins, including a model fallback.
+            providerId = event.provider || providerId;
+            providerModel = event.model || providerModel;
 
             // Streaming auto-continuation: if output ended mid-generation (token limit, unclosed blocks)
             let continuationCount = 0;
@@ -534,7 +537,8 @@ export async function runNonStreamingAiExecution({
     store: createTaskStateStore(env),
     sleep: retrySleepFor(env),
     sessionId,
-    model: selectedModel,
+    // Provider entries carry their own primary/fallback model; pinning one
+    // here would defeat the Muse rollback.
     reasoning: selectedReasoning.reasoning,
     temperature: selectedReasoning.temperature,
   });
