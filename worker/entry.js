@@ -26,6 +26,7 @@ import {
 } from "./auth.js";
 import { handleChats, refreshConversationTitles } from "./chats.js";
 import { handleChatShares } from "./chatShares.js";
+import { handleBrowse } from "./browse.js";
 import { handleProjects } from "./projects.js";
 import { handleN8nWebhook } from "./n8nBridge.js";
 import { handleZiina } from "./ziina.js";
@@ -209,6 +210,13 @@ export default {
       if (chatsRes) return withDirectAiCors(chatsRes);
     }
 
+    // URL -> Markdown through Browser Run Quick Actions. The handler owns its
+    // session check and per-client rate limit.
+    if (url.pathname === "/api/browse") {
+      const browseRes = await handleBrowse(request, env);
+      if (browseRes) return withDirectAiCors(browseRes);
+    }
+
     // Project folders — same pre-gate placement as chats: the handler
     // authorises with verifySession itself so a missing AUTH_SECRET follows the
     // chats path rather than the generic gate.
@@ -240,6 +248,7 @@ export default {
       "/api/publish",
       "/api/assets",
       "/api/chats",
+      "/api/browse",
       "/api/tasks",
       "/api/task",
       "/api/context",

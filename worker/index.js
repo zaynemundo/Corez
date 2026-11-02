@@ -45,6 +45,7 @@ import {
   scanPublishRecords,
 } from "./publishStore.js";
 import { handleImage, handleWorkersAIImage } from "./imageRoutes.js";
+import { buildUrlContextMessage, resolveUrlContext } from "./browse.js";
 import { handleR2Assets, handleR2Apps } from "./r2Routes.js";
 import { handlePublish } from "./publishRoutes.js";
 import {
@@ -351,6 +352,28 @@ async function handleAi(request, env) {
     env,
     apiMessages,
   });
+
+  // URL-to-Markdown Quick Action. Only the current user message is considered,
+  // and failures are best-effort so the chat still answers if Browser Run is
+  // unavailable or rate-limited.
+  if (uid && !body.harness) {
+    const userText =
+      typeof lastUserMessage?.content === "string"
+        ? lastUserMessage.content
+        : prompt;
+    const urlContext = await resolveUrlContext({
+      text: userText,
+      request,
+      env,
+      signal: request.signal,
+    });
+    if (urlContext) {
+      apiMessages.push({
+        role: "system",
+        content: buildUrlContextMessage(urlContext),
+      });
+    }
+  }
 
   const clientDisconnectSignal = (() => {
     const controller = new AbortController();

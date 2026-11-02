@@ -5,6 +5,11 @@
   "compatibility_date": "2026-07-18",
   "compatibility_flags": ["nodejs_compat"],
   "workers_dev": true,
+  // Browser Run Quick Actions (URL -> Markdown). Requires a Workers Paid plan
+  // and Browser Run enabled on the account.
+  "browser": {
+    "binding": "BROWSER"
+  },
   // Production marker for the auth gate (worker/auth.js isProductionRequest):
   // with `production` declared, a deployment that loses its AUTH_SECRET
   // refuses protected routes (retryable 503) instead of accepting bearer-less
