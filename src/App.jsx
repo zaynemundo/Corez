@@ -243,6 +243,8 @@ function MainApp({ theme, setTheme }) {
   const conversationPersonas = isConversationChat
     ? activeSession?.personas || []
     : conversationDraft || DEFAULT_CONVERSATION_PERSONAS;
+  const conversationTyping =
+    conversationMode && isThinking && !String(streamingContent || "").trim();
 
   useEffect(() => {
     setActiveView(isSitesView ? "sites" : "chat");
@@ -615,11 +617,11 @@ function MainApp({ theme, setTheme }) {
                     }) && (
                       <div
                         className={`message-wrapper ai${
-                          streamingSpeaker ? " conversation" : ""
+                          conversationMode ? " conversation" : ""
                         }`}
                       >
                         <div className="message-body">
-                          {streamingSpeaker ? (
+                          {streamingSpeaker && !conversationTyping ? (
                             <div className="message-speaker">
                               <span className="message-speaker-avatar" aria-hidden="true">
                                 {String(streamingSpeaker.name || "AI")
@@ -634,6 +636,27 @@ function MainApp({ theme, setTheme }) {
                               </span>
                             </div>
                           ) : null}
+                          {conversationTyping && (
+                            <div
+                              className="message-content message-typing-content"
+                              role="status"
+                              aria-live="polite"
+                              aria-label={
+                                streamingSpeaker?.name
+                                  ? `${streamingSpeaker.name} is typing`
+                                  : "AI is typing"
+                              }
+                            >
+                              <span
+                                className="message-typing-dots"
+                                aria-hidden="true"
+                              >
+                                <span />
+                                <span />
+                                <span />
+                              </span>
+                            </div>
+                          )}
                           {(buildPhaseLabel(buildPhase) || swarmVisible) && (
                             <span
                               className="sr-only"
