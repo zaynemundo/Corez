@@ -60,6 +60,39 @@ export async function ensureChatsTables(env) {
   const cached = tablesReady.get(env.DB);
   if (cached) return cached;
   const ready = (async () => {
+    // Fast path for the deployed schema: a cold isolate used to issue ~18 DDL
+    // writes before the first chats read. If the columns are already present,
+    // one read each for chats/chat_messages is enough and avoids taking DDL
+    // locks on every request.
+    try {
+      const schemaReady = async (table, columns) => {
+        const info = await env.DB.prepare(`PRAGMA table_info(${table})`).all();
+        const names = new Set(
+          (info?.results || []).map((row) => String(row.name || "")),
+        );
+        return columns.every((column) => names.has(column));
+      };
+      const chatsReady = await schemaReady("chats", [
+        "project_id",
+        "pinned_at",
+        "sort_order",
+        "chat_mode",
+        "personas",
+        "last_user_at",
+        "title_updated_at",
+      ]);
+      const messagesReady = await schemaReady("chat_messages", [
+        "turn_id",
+        "speaker_id",
+        "speaker_name",
+        "model_id",
+      ]);
+      const manualReady = await schemaReady("chat_list_manual", ["list_key"]);
+      if (chatsReady && messagesReady && manualReady) return;
+    } catch {
+      // Missing tables/columns or an unavailable schema probe: use the full
+      // idempotent bootstrap below.
+    }
     // Table/index/column text lives in worker/dbSchema.js; the control flow
     // stays here: parallel creates, then the three column migrations with
     // duplicate-column tolerance (any other error is real and rethrown),
