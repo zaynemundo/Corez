@@ -70,6 +70,44 @@ describe('provider fallback chain recovery', () => {
     expect(chain.map((p) => p.id)).toEqual(['opencode-go']);
   });
 
+  it('orders all three OpenCode Go keys as fallback providers', () => {
+    const chain = buildProviderChain({
+      OPENCODE_GO_API_KEY: 'key-one',
+      OPENCODE_GO_API_KEY_2: 'key-two',
+      OPENCODE_GO_API_KEY_3: 'key-three',
+    });
+    expect(chain.map((p) => p.id)).toEqual([
+      'opencode-go',
+      'opencode-go-2',
+      'opencode-go-3',
+    ]);
+  });
+
+  it('falls through from an expired first key to the second key', async () => {
+    const auths = [];
+    vi.stubGlobal('fetch', vi.fn(async (_url, init) => {
+      auths.push(init.headers.Authorization);
+      if (auths.length === 1) {
+        return errorResponse(401, 'This API key has expired.');
+      }
+      return okResponse('second key answered');
+    }));
+
+    const result = await runProviderChain([{ role: 'user', content: 'hi' }], {
+      env: {
+        OPENCODE_GO_API_KEY: 'expired-key',
+        OPENCODE_GO_API_KEY_2: 'valid-key',
+      },
+      sleep: async () => {},
+      clock: () => 0,
+      jitter: () => 0,
+    });
+
+    expect(result.content).toBe('second key answered');
+    expect(result.provider).toBe('opencode-go-2');
+    expect(auths).toEqual(['Bearer expired-key', 'Bearer valid-key']);
+  });
+
   it('recovers after more than three transient failures (5x429 then 200)', async () => {
     const { clock, sleep } = fakeClock();
     let attempts = 0;
@@ -406,6 +444,42 @@ describe('runStreamingChain empty-stream behavior', () => {
   // falling through, and when every provider fails empty the error is
   // retryable 503 so the client's harness auto-resume re-issues the request.
   const fast = { sleep: async () => {} };
+
+  it('falls through to the second key when the first key is rejected', async () => {
+    const auths = [];
+    vi.stubGlobal('fetch', vi.fn(async (_url, init) => {
+      auths.push(init.headers.Authorization);
+      if (auths.length === 1) {
+        return errorResponse(401, 'This API key has expired.');
+      }
+      return sseChunks(['second key ', 'answered', 'done']);
+    }));
+
+    const events = [];
+    for await (const event of runStreamingChain(
+      [{ role: 'user', content: 'hello' }],
+      {
+        env: {
+          OPENCODE_GO_API_KEY: 'expired-key',
+          OPENCODE_GO_API_KEY_2: 'valid-key',
+        },
+        signal: null,
+        ...fast,
+      },
+    )) {
+      events.push(event);
+    }
+
+    const done = events.find((event) => event.type === 'done');
+    expect(done?.provider).toBe('opencode-go-2');
+    expect(
+      events
+        .filter((event) => event.type === 'delta')
+        .map((event) => event.text)
+        .join(''),
+    ).toBe('second key answered');
+    expect(auths).toEqual(['Bearer expired-key', 'Bearer valid-key']);
+  });
 
   it('retries an empty stream up to 3 times on the same provider, then fails retryable 503', async () => {
     let calls = 0;

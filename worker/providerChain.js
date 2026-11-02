@@ -133,12 +133,14 @@ async function sleepInterruptible(ms, signal, sleep) {
 }
 
 /**
- * Build the chat provider chain — SINGLE provider only.
- * Cloudflare Chat ( /api/ai ) uses OPENCODE_GO_API_KEY exclusively.
- * No DeepSeek or OpenRouter fallback for chat. Image generation
- * (callOpenRouterImage in imageProvider.js) still uses OPENROUTER_API_KEY
- * separately when configured. Disable with OPENCODE_GO_DISABLED (any truthy
- * value).
+ * Build the chat provider chain from the ordered OpenCode Go key pool.
+ * Cloudflare Chat (/api/ai) uses OPENCODE_GO_API_KEY first, then the optional
+ * OPENCODE_GO_API_KEY_2 and OPENCODE_GO_API_KEY_3 credentials. Each key is a
+ * separate provider entry, so an expired or unauthorized key falls through to
+ * the next key through the normal chain. No DeepSeek or OpenRouter text
+ * fallback exists for chat. Image generation (callOpenRouterImage in
+ * imageProvider.js) still uses OPENROUTER_API_KEY separately. Disable the whole
+ * chain with OPENCODE_GO_DISABLED (any truthy value).
  */
 export function buildProviderChain(env = {}, extra = {}) {
   const chain = [];
@@ -161,17 +163,26 @@ export function buildProviderChain(env = {}, extra = {}) {
     DEFAULT_NONSTREAM_TIMEOUT_MS,
   );
 
-  const opencodeKey = env?.OPENCODE_GO_API_KEY || env?.OPENCODE_API_KEY;
-  if (opencodeKey && !isDisabled(env?.OPENCODE_GO_DISABLED)) {
+  const opencodeKeys = [
+    env?.OPENCODE_GO_API_KEY || env?.OPENCODE_API_KEY,
+    env?.OPENCODE_GO_API_KEY_2,
+    env?.OPENCODE_GO_API_KEY_3,
+  ]
+    .map((key) => (typeof key === "string" ? key.trim() : ""))
+    .filter(Boolean);
+  // A duplicated slot must not become a retry of the same credential.
+  const uniqueKeys = [...new Set(opencodeKeys)];
+
+  if (uniqueKeys.length > 0 && !isDisabled(env?.OPENCODE_GO_DISABLED)) {
     // Clamp to the allow-list so text traffic can never leave the approved
     // model, whatever a stale env var, an unapproved id or a typo asks for.
     const model = resolveTextModel(env?.OPENCODE_MODEL || DEFAULT_MODEL);
     const endpoint = env?.OPENCODE_ENDPOINT || OPENCODE_DEFAULT_ENDPOINT;
     const api = resolveApiMode({ endpoint, api: env?.OPENCODE_API_MODE });
-    const callOptions = (sessionId) => ({
+    const callOptions = (sessionId, key) => ({
       endpoint,
       api,
-      key: opencodeKey,
+      key,
       model,
       label: "opencode",
       extraHeaders: {
@@ -197,28 +208,32 @@ export function buildProviderChain(env = {}, extra = {}) {
         bodyExtra.temperature = options.temperature;
       return bodyExtra;
     };
-    chain.push({
-      id: "opencode-go",
-      label: "opencode",
-      model,
-      call: (messages, options = {}) =>
-        callChatEndpoint({
-          ...callOptions(options.sessionId),
-          messages,
-          signal: options.signal,
-          bodyExtra: buildBodyExtra(options),
-          ...(options.model ? { model: options.model } : {}),
-        }),
-      stream: (messages, options = {}) =>
-        streamChatEndpoint({
-          ...callOptions(options.sessionId),
-          messages,
-          signal: options.signal,
-          env,
-          onTtft: options.onTtft,
-          bodyExtra: buildBodyExtra(options),
-          ...(options.model ? { model: options.model } : {}),
-        }),
+
+    uniqueKeys.forEach((opencodeKey, index) => {
+      chain.push({
+        // Key 1 keeps the historical id; later keys are stable fallback ids.
+        id: index === 0 ? "opencode-go" : `opencode-go-${index + 1}`,
+        label: "opencode",
+        model,
+        call: (messages, options = {}) =>
+          callChatEndpoint({
+            ...callOptions(options.sessionId, opencodeKey),
+            messages,
+            signal: options.signal,
+            bodyExtra: buildBodyExtra(options),
+            ...(options.model ? { model: options.model } : {}),
+          }),
+        stream: (messages, options = {}) =>
+          streamChatEndpoint({
+            ...callOptions(options.sessionId, opencodeKey),
+            messages,
+            signal: options.signal,
+            env,
+            onTtft: options.onTtft,
+            bodyExtra: buildBodyExtra(options),
+            ...(options.model ? { model: options.model } : {}),
+          }),
+      });
     });
   }
 
