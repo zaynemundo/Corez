@@ -11,7 +11,10 @@
   // requests as the development identity. Every real deployment must keep
   // this; `wrangler dev` can override it locally with ENVIRONMENT=development.
   "vars": {
-    "ENVIRONMENT": "production"
+    "ENVIRONMENT": "production",
+    // Approved rollback if the primary DeepSeek upstream endpoint is
+    // unavailable. Keys are tried for DeepSeek first, then for Muse.
+    "OPENCODE_MODEL_FALLBACK": "muse-spark-1.3-contributor"
   },
   // CPU ceiling per invocation: 30s on Workers Paid (the Free plan rejected
   // this with code 100328 and hard-caps at 10ms, which caused the recurring

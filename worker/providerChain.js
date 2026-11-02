@@ -24,6 +24,7 @@ import {
 
 import {
   DEFAULT_TEXT_MODEL,
+  MUSE_SPARK_1_3_CONTRIBUTOR,
   resolveTextModel,
 } from "../packages/agent-core/providers/modelIds.js";
 
@@ -177,13 +178,22 @@ export function buildProviderChain(env = {}, extra = {}) {
     // Clamp to the allow-list so text traffic can never leave the approved
     // model, whatever a stale env var, an unapproved id or a typo asks for.
     const model = resolveTextModel(env?.OPENCODE_MODEL || DEFAULT_MODEL);
+    // Optional resilience switch: when the primary upstream endpoint is
+    // unavailable, try the approved rollback model on the same key pool.
+    const fallbackModel = env?.OPENCODE_MODEL_FALLBACK
+      ? resolveTextModel(env.OPENCODE_MODEL_FALLBACK)
+      : null;
+    const models =
+      fallbackModel && fallbackModel !== model
+        ? [model, fallbackModel]
+        : [model];
     const endpoint = env?.OPENCODE_ENDPOINT || OPENCODE_DEFAULT_ENDPOINT;
     const api = resolveApiMode({ endpoint, api: env?.OPENCODE_API_MODE });
-    const callOptions = (sessionId, key) => ({
+    const callOptions = (sessionId, key, providerModel) => ({
       endpoint,
       api,
       key,
-      model,
+      model: providerModel,
       label: "opencode",
       extraHeaders: {
         "HTTP-Referer": "https://corez.ai",
@@ -209,30 +219,37 @@ export function buildProviderChain(env = {}, extra = {}) {
       return bodyExtra;
     };
 
-    uniqueKeys.forEach((opencodeKey, index) => {
-      chain.push({
+    models.forEach((providerModel, modelIndex) => {
+      uniqueKeys.forEach((opencodeKey, index) => {
         // Key 1 keeps the historical id; later keys are stable fallback ids.
-        id: index === 0 ? "opencode-go" : `opencode-go-${index + 1}`,
-        label: "opencode",
-        model,
-        call: (messages, options = {}) =>
-          callChatEndpoint({
-            ...callOptions(options.sessionId, opencodeKey),
-            messages,
-            signal: options.signal,
-            bodyExtra: buildBodyExtra(options),
-            ...(options.model ? { model: options.model } : {}),
-          }),
-        stream: (messages, options = {}) =>
-          streamChatEndpoint({
-            ...callOptions(options.sessionId, opencodeKey),
-            messages,
-            signal: options.signal,
-            env,
-            onTtft: options.onTtft,
-            bodyExtra: buildBodyExtra(options),
-            ...(options.model ? { model: options.model } : {}),
-          }),
+        const baseId =
+          index === 0 ? "opencode-go" : `opencode-go-${index + 1}`;
+        chain.push({
+          id:
+            modelIndex === 0
+              ? baseId
+              : `${baseId}-${providerModel === MUSE_SPARK_1_3_CONTRIBUTOR ? "muse" : "fallback"}`,
+          label: "opencode",
+          model: providerModel,
+          call: (messages, options = {}) =>
+            callChatEndpoint({
+              ...callOptions(options.sessionId, opencodeKey, providerModel),
+              messages,
+              signal: options.signal,
+              bodyExtra: buildBodyExtra(options),
+              ...(options.model ? { model: options.model } : {}),
+            }),
+          stream: (messages, options = {}) =>
+            streamChatEndpoint({
+              ...callOptions(options.sessionId, opencodeKey, providerModel),
+              messages,
+              signal: options.signal,
+              env,
+              onTtft: options.onTtft,
+              bodyExtra: buildBodyExtra(options),
+              ...(options.model ? { model: options.model } : {}),
+            }),
+        });
       });
     });
   }

@@ -83,6 +83,23 @@ describe('provider fallback chain recovery', () => {
     ]);
   });
 
+  it('can append the approved rollback model after the key pool', () => {
+    const chain = buildProviderChain({
+      OPENCODE_GO_API_KEY: 'key-one',
+      OPENCODE_GO_API_KEY_2: 'key-two',
+      OPENCODE_GO_API_KEY_3: 'key-three',
+      OPENCODE_MODEL_FALLBACK: 'muse-spark-1.3-contributor',
+    });
+    expect(chain.map((p) => [p.id, p.model])).toEqual([
+      ['opencode-go', 'deepseek-v4.1-flash'],
+      ['opencode-go-2', 'deepseek-v4.1-flash'],
+      ['opencode-go-3', 'deepseek-v4.1-flash'],
+      ['opencode-go-muse', 'muse-spark-1.3-contributor'],
+      ['opencode-go-2-muse', 'muse-spark-1.3-contributor'],
+      ['opencode-go-3-muse', 'muse-spark-1.3-contributor'],
+    ]);
+  });
+
   it('falls through from an expired first key to the second key', async () => {
     const auths = [];
     vi.stubGlobal('fetch', vi.fn(async (_url, init) => {
@@ -444,6 +461,44 @@ describe('runStreamingChain empty-stream behavior', () => {
   // falling through, and when every provider fails empty the error is
   // retryable 503 so the client's harness auto-resume re-issues the request.
   const fast = { sleep: async () => {} };
+
+  it('falls back to the approved model when the primary endpoint is unavailable', async () => {
+    const models = [];
+    vi.stubGlobal('fetch', vi.fn(async (_url, init) => {
+      const body = JSON.parse(init.body);
+      models.push(body.model);
+      if (body.model === 'deepseek-v4.1-flash') {
+        return errorResponse(503, 'Upstream request failed: Endpoint is unavailable.');
+      }
+      return sseChunks(['muse ', 'answered', 'done']);
+    }));
+
+    const events = [];
+    for await (const event of runStreamingChain(
+      [{ role: 'user', content: 'hello' }],
+      {
+        env: {
+          OPENCODE_GO_API_KEY: 'valid-key',
+          OPENCODE_MODEL_FALLBACK: 'muse-spark-1.3-contributor',
+        },
+        signal: null,
+        ...fast,
+      },
+    )) {
+      events.push(event);
+    }
+
+    const done = events.find((event) => event.type === 'done');
+    expect(done?.provider).toBe('opencode-go-muse');
+    expect(
+      events
+        .filter((event) => event.type === 'delta')
+        .map((event) => event.text)
+        .join(''),
+    ).toBe('muse answered');
+    expect(models[0]).toBe('deepseek-v4.1-flash');
+    expect(models.at(-1)).toBe('muse-spark-1.3-contributor');
+  });
 
   it('falls through to the second key when the first key is rejected', async () => {
     const auths = [];
