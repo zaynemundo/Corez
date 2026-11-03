@@ -27,6 +27,7 @@ import {
 import { handleChats, refreshConversationTitles } from "./chats.js";
 import { handleChatShares } from "./chatShares.js";
 import { handleBrowse } from "./browse.js";
+import { handleRuntimeCheck } from "./runtimeCheck.js";
 import { handleProjects } from "./projects.js";
 import { handleN8nWebhook } from "./n8nBridge.js";
 import { handleZiina } from "./ziina.js";
@@ -217,6 +218,11 @@ export default {
       if (browseRes) return withDirectAiCors(browseRes);
     }
 
+    if (url.pathname === "/api/runtime-check") {
+      const runtimeRes = await handleRuntimeCheck(request, env);
+      if (runtimeRes) return withDirectAiCors(runtimeRes);
+    }
+
     // Project folders — same pre-gate placement as chats: the handler
     // authorises with verifySession itself so a missing AUTH_SECRET follows the
     // chats path rather than the generic gate.
@@ -249,6 +255,7 @@ export default {
       "/api/assets",
       "/api/chats",
       "/api/browse",
+      "/api/runtime-check",
       "/api/tasks",
       "/api/task",
       "/api/context",

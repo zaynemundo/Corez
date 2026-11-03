@@ -21,6 +21,11 @@ import {
   VERIFIER_VERSION,
 } from "./creationVerifier.js";
 import { repairMalformedHtml } from "./htmlRepair.js";
+import {
+  needsRuntimeCheck,
+  runRuntimeVerification,
+  runtimeSummary,
+} from "./runtimeVerifier.js";
 import { buildDesignSystemPrompt } from "../packages/agent-core/designSystems/index.js";
 import { estimateCostUsd } from "./utils.js";
 import {
@@ -750,6 +755,30 @@ export async function* runCreationHarness(options) {
         state.intentType,
         { skipCoverage },
       );
+      // Execute the artifact when it has a real runtime surface. Static checks
+      // cannot catch a missing global, a broken script, or a WebGL fallback;
+      // those become repair failures so the user receives a working page.
+      const runtimeDisabled = /^(?:1|true|yes|on)$/i.test(
+        String(env?.RUNTIME_VERIFICATION_DISABLED || ""),
+      );
+      if (
+        state.verification.passed &&
+        !runtimeDisabled &&
+        needsRuntimeCheck(collected)
+      ) {
+        const runtime = await runRuntimeVerification(env, collected);
+        state.verification.runtime = runtime;
+        if (runtime.checked && !runtime.passed) {
+          state.verification.passed = false;
+          state.verification.failures = [
+            ...(state.verification.failures || []),
+            ...runtime.failures,
+          ];
+          console.warn(
+            `Runtime verification failed: ${runtimeSummary(runtime)}`,
+          );
+        }
+      }
     }
 
     // An empty or whitespace-only build is a provider failure, never a
