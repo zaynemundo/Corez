@@ -43,14 +43,12 @@
     "@capacitor/core": "^8.5.3",
     "@capacitor/splash-screen": "^8.0.2",
     "@capacitor/status-bar": "^8.0.4",
-    "@react-three/fiber": "^8.17.10",
     "acorn": "^8.17.0",
     "lucide-react": "^0.475.0",
     "pdfjs-dist": "^6.4.299",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "react-router-dom": "^7.18.2",
-    "three": "^0.160.1"
+    "react-router-dom": "^7.18.2"
   },
   "devDependencies": {
     "@capacitor/assets": "^3.0.5",
