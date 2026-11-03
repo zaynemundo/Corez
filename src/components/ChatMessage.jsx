@@ -269,7 +269,37 @@ export default function ChatMessage({
     if (tableLines.length < 2) return null;
     const parseRow = (line) => {
       const trimmed = line.trim().replace(/^\||\|$/g, "");
-      return trimmed.split("|").map((cell) => cell.trim());
+      const cells = [];
+      let current = "";
+      let inCode = false;
+      let escaped = false;
+      for (const character of trimmed) {
+        if (escaped) {
+          current += character;
+          escaped = false;
+          continue;
+        }
+        if (character === "\\") {
+          escaped = true;
+          continue;
+        }
+        if (character === "`") {
+          inCode = !inCode;
+          current += character;
+          continue;
+        }
+        // Pipes inside inline code or escaped with \| are cell content, not
+        // column separators. Naively splitting every "|" shifts the row.
+        if (character === "|" && !inCode) {
+          cells.push(current.trim());
+          current = "";
+          continue;
+        }
+        current += character;
+      }
+      if (escaped) current += "\\";
+      cells.push(current.trim());
+      return cells;
     };
 
     const headers = parseRow(tableLines[0]);
@@ -327,8 +357,10 @@ export default function ChatMessage({
                   <tbody>
                     {tableData.bodyRows.map((row, rIdx) => (
                       <tr key={rIdx}>
-                        {row.map((cell, cIdx) => (
-                          <td key={cIdx}>{renderInlineFormattedText(cell)}</td>
+                        {tableData.headers.map((_, cIdx) => (
+                          <td key={cIdx}>
+                            {renderInlineFormattedText(row[cIdx] || "")}
+                          </td>
                         ))}
                       </tr>
                     ))}
