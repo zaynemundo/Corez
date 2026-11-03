@@ -620,6 +620,33 @@ export const PREVIEW_ERROR_REPORTER_SCRIPT = `
 const PREVIEW_CSP =
   "default-src blob:; script-src 'unsafe-inline' https:; style-src 'unsafe-inline' https:; img-src data: https: blob:; font-src data: https:; media-src data: https: blob:; connect-src https:";
 
+// Full-document and plain-HTML previews do not go through the React runtime,
+// so they have no THREE global. Generated Three.js pages commonly expect one
+// (the generation prompt tells them to use the preview global); without this
+// the scene silently falls back with "WebGL unavailable".
+const THREE_CDN_SCRIPT =
+  '<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>';
+const THREE_REFERENCE_PATTERN =
+  /(?:window\.THREE\b|\bTHREE\s*\.|new\s+THREE\b|@react-three\/|from\s+['"]three['"])/;
+
+function needsThreeRuntime(code) {
+  return THREE_REFERENCE_PATTERN.test(String(code || ""));
+}
+
+function injectThreeRuntime(html) {
+  if (!html || !needsThreeRuntime(html)) return html;
+  if (/<script[^>]+src=["'][^"']*three(?:\.min)?\.js/i.test(html)) {
+    return html;
+  }
+  if (/<head[^>]*>/i.test(html)) {
+    return html.replace(
+      /<head[^>]*>/i,
+      (match) => `${match}\n  ${THREE_CDN_SCRIPT}`,
+    );
+  }
+  return `${THREE_CDN_SCRIPT}\n${html}`;
+}
+
 /**
  * A revision can leave an early call to a function that reads a top-level
  * `const reduceMotion` declared later in the same script. That is a temporal
@@ -670,7 +697,9 @@ export function formatCodeForPreview(rawCode) {
     const page = normalizePageDocument(trimmed) || trimmed;
     return withPreviewCsp(
       hoistReducedMotionDeclaration(
-        injectNavigationGuard(injectFullscreenGamePatch(page)),
+        injectNavigationGuard(
+          injectFullscreenGamePatch(injectThreeRuntime(page)),
+        ),
       ),
     );
   }
@@ -688,13 +717,14 @@ export function formatCodeForPreview(rawCode) {
       /<script[\s>]/i.test(trimmed) ||
       /document\.get|document\.query|window\.add/i.test(trimmed))
   ) {
+    const threeScript = needsThreeRuntime(trimmed) ? `  ${THREE_CDN_SCRIPT}\n` : "";
     return withPreviewCsp(`<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Corez Live Preview</title>
-  <script src="https://cdn.tailwindcss.com"></script>
+${threeScript}  <script src="https://cdn.tailwindcss.com"></script>
   <style>
     :root { color-scheme: dark; }
     body { margin: 0; padding: 0; background: #09090b; color: #f4f4f5; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; min-height: 100vh; }

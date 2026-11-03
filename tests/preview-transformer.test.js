@@ -246,6 +246,39 @@ export default function Navbar() {
     expect(formatted).not.toContain("import * as THREE from 'three'");
   });
 
+  it('injects the Three.js runtime into full HTML pages that expect a global THREE', () => {
+    const html = `<!DOCTYPE html>
+<html>
+<head><style>canvas{display:block}</style></head>
+<body>
+<canvas id="scene"></canvas>
+<script>
+  if (!window.THREE) { document.body.textContent = 'WEBGL UNAVAILABLE'; }
+</script>
+</body>
+</html>`;
+    const formatted = formatCodeForPreview(html);
+    expect(formatted).toContain('three.min.js');
+    expect(formatted).toContain('window.THREE');
+  });
+
+  it('injects the Three.js runtime into plain HTML snippets that use THREE', () => {
+    const html = `<canvas id="scene"></canvas>
+<script>
+  const renderer = new THREE.WebGLRenderer();
+</script>`;
+    const formatted = formatCodeForPreview(html);
+    expect(formatted).toContain('three.min.js');
+    expect(formatted).toContain('new THREE.WebGLRenderer');
+  });
+
+  it('does not inject the Three.js runtime into ordinary pages', () => {
+    const formatted = formatCodeForPreview(
+      '<!DOCTYPE html><html><head></head><body><h1>Hello</h1></body></html>',
+    );
+    expect(formatted).not.toContain('three.min.js');
+  });
+
   it('provides top-level PerspectiveCamera and Three.js class declarations to prevent ReferenceError: PerspectiveCamera is not defined', () => {
     const code = `
       import React, { useEffect } from 'react';
