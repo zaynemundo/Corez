@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import { lazy, Suspense, useState, useEffect, useRef, useMemo } from "react";
 import { PanelLeft, Loader2 } from "lucide-react";
 import {
   BrowserRouter,
@@ -47,6 +47,10 @@ import { useChatTurnExecution } from "./hooks/useChatTurnExecution.js";
 import { useConversationTurnExecution } from "./hooks/useConversationTurnExecution.js";
 import ConversationSetupModal from "./components/ConversationSetupModal.jsx";
 import LocationPermission from "./components/LocationPermission.jsx";
+
+const ThreeHeroScene = lazy(() =>
+  import("./components/ThreeHeroScene.jsx"),
+);
 
 const DEFAULT_CONVERSATION_PERSONAS = [
   {
@@ -572,6 +576,18 @@ function MainApp({ theme, setTheme }) {
                   </div>
                 ) : !activeSession || activeSession.messages.length === 0 ? (
                   <div className="new-chat-hero">
+                    {!isSiteEditChat && (
+                      <Suspense
+                        fallback={
+                          <div
+                            className="three-hero-scene is-loading"
+                            aria-hidden="true"
+                          />
+                        }
+                      >
+                        <ThreeHeroScene />
+                      </Suspense>
+                    )}
                     <h1 className="new-chat-hero-title">
                       {isSiteEditChat
                         ? t("common.sites.editChatHeading")

@@ -1723,6 +1723,38 @@ h6 {
   text-align: center;
 }
 
+.three-hero-scene {
+  width: 178px;
+  height: 150px;
+  margin: -0.4rem auto 0.1rem;
+  opacity: 0.92;
+  pointer-events: none;
+}
+.three-hero-scene canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+}
+.three-hero-scene.is-loading {
+  opacity: 0;
+}
+.three-hero-fallback {
+  width: 116px;
+  height: 116px;
+  margin: 0.5rem auto 0.7rem;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    transparent 0 55%,
+    var(--border-color) 56% 57%,
+    transparent 58% 69%,
+    var(--border-color) 70% 71%,
+    transparent 72%
+  );
+  opacity: 0.55;
+  pointer-events: none;
+}
+
 .new-chat-hero-title {
   margin: 0;
   font-family: var(--font-heading);
