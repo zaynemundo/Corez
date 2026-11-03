@@ -3373,10 +3373,12 @@ h6 {
 }
 
 .chat-textarea {
-  flex: 1;
+  flex: 1 1 0;
   min-width: 0;
   max-width: 100%;
-  width: 100%;
+  /* Let flex shrink the field beside the controls. A hard width:100% could
+     overlap the send button before the multiline layout engaged. */
+  width: auto;
   box-sizing: border-box;
   background: none;
   border: none;

@@ -18,6 +18,18 @@ const renderComposer = (input) =>
   );
 
 describe("ChatInput multiline composer", () => {
+  it("moves a long single-line prompt to the multiline layout", async () => {
+    const { container } = renderComposer(
+      "Revise code: add a mini map and dont add the sun just a background maybe add some buildings or cool",
+    );
+
+    await waitFor(() => {
+      expect(
+        container.querySelector("form.input-box").classList.contains("is-multiline"),
+      ).toBe(true);
+    });
+  });
+
   it("uses the bottom-control layout for a wrapped prompt", async () => {
     const { container, rerender } = renderComposer("");
 

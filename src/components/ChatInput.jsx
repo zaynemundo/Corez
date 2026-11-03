@@ -134,13 +134,46 @@ export default function ChatInput({
 
   useEffect(() => {
     const textarea = refToUse.current;
-    if (!textarea) return;
-    textarea.style.height = "auto";
-    const nextHeight = Math.min(textarea.scrollHeight, 180);
-    textarea.style.height = `${nextHeight}px`;
-    // Wrapping is not visible in the value alone, so measure it. Explicit
-    // newlines also count even before the browser reports a scroll height.
-    setIsMultiline(nextHeight > 36 || String(input).includes("\n"));
+    if (!textarea) return undefined;
+
+    const resizeTextarea = () => {
+      textarea.style.height = "auto";
+      let nextHeight = Math.min(textarea.scrollHeight, 180);
+      const computedLineHeight =
+        Number.parseFloat(getComputedStyle(textarea).lineHeight) || 24;
+      // scrollHeight can be measured while the one-row flex layout is still
+      // settling, especially after a paste. Estimate wrapped lines from the
+      // actual textarea width as a fallback so a long prompt can never stay in
+      // the one-row layout with its second line clipped.
+      const charsPerLine = Math.max(
+        20,
+        Math.floor((textarea.clientWidth || 320) / 7.5),
+      );
+      const estimatedLines = Math.max(
+        1,
+        Math.ceil(String(input || "").length / charsPerLine),
+      );
+      if (estimatedLines > 1) {
+        nextHeight = Math.max(
+          nextHeight,
+          Math.min(estimatedLines * computedLineHeight + 8, 180),
+        );
+      }
+      textarea.style.height = `${nextHeight}px`;
+      setIsMultiline(
+        nextHeight > computedLineHeight + 12 ||
+          String(input).includes("\n") ||
+          estimatedLines > 1,
+      );
+    };
+
+    resizeTextarea();
+    const frame = requestAnimationFrame(resizeTextarea);
+    window.addEventListener("resize", resizeTextarea);
+    return () => {
+      cancelAnimationFrame(frame);
+      window.removeEventListener("resize", resizeTextarea);
+    };
   }, [input, refToUse]);
 
   // The multiline layout gives the textarea the full width. Re-measure after
