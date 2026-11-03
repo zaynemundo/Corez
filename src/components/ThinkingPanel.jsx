@@ -127,6 +127,9 @@ function ThinkingBody({ text }) {
  * @param {string} [props.placeholder] Live status shown while no reasoning has
  *   arrived yet (e.g. "Working…"). It is replaced by the reasoning the moment
  *   the first event streams in, so the panel itself is the progress indicator.
+ * @param {string} [props.output] The answer draft while it is streaming. It is
+ *   kept inside the thinking panel until the turn completes, then the finished
+ *   message is rendered normally in the transcript.
  */
 export function ThinkingPanel({
   text,
@@ -136,11 +139,13 @@ export function ThinkingPanel({
   bodyId,
   live = false,
   placeholder = "",
+  output = "",
 }) {
   const { t } = useI18n();
   const value = typeof text === "string" ? text.trim() : "";
-  const waiting = !value && live && Boolean(placeholder);
-  if (!value && !waiting) return null;
+  const outputValue = typeof output === "string" ? output : "";
+  const waiting = !value && !outputValue && live && Boolean(placeholder);
+  if (!value && !outputValue && !waiting) return null;
   const label =
     !live && seconds > 0
       ? t("common.thinking.thoughtForSeconds", { seconds })
@@ -169,9 +174,19 @@ export function ThinkingPanel({
           aria-hidden="true"
         />
       </button>
-      {expanded && value && (
+      {expanded && (value || outputValue) && (
         <div className="thinking-panel-body" id={bodyId}>
-          <ThinkingBody text={value} />
+          {value && <ThinkingBody text={value} />}
+          {outputValue && (
+            <div className="thinking-panel-output">
+              <div className="thinking-panel-output-label">
+                {live
+                  ? t("common.thinking.responding")
+                  : t("common.thinking.response")}
+              </div>
+              <div className="thinking-panel-output-text">{outputValue}</div>
+            </div>
+          )}
         </div>
       )}
     </div>

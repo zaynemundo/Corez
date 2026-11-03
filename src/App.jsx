@@ -670,6 +670,7 @@ function MainApp({ theme, setTheme }) {
                           {!conversationMode && (
                             <ThinkingPanel
                               text={streamingThinking}
+                              output={streamingContent || ""}
                               live
                               expanded={isThinkingOpen}
                               onToggle={() => setIsThinkingOpen((prev) => !prev)}
@@ -677,7 +678,7 @@ function MainApp({ theme, setTheme }) {
                               placeholder={t("common.thinking.working")}
                             />
                           )}
-                          {streamingContent && (
+                          {conversationMode && streamingContent && (
                             <div
                               className="message-content streaming-text"
                               role="status"

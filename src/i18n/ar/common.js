@@ -43,6 +43,8 @@ export default {
   thinking: {
     label: "التفكير",
     working: "جارٍ العمل…",
+    responding: "جارٍ بثّ الإجابة…",
+    response: "الإجابة",
     thoughtForSeconds: "فكّر لمدة {seconds} ثانية",
   },
 

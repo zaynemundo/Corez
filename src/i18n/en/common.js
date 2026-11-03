@@ -56,6 +56,8 @@ export default {
     // reasoning yet. It is replaced by the reasoning itself the moment the
     // first thinking event arrives.
     working: "Working…",
+    responding: "Streaming response…",
+    response: "Response",
     // Shown on a finished message once the thinking duration is known. The
     // panel renders only when the gateway returns real reasoning — there is
     // no placeholder text when it does not.

@@ -85,6 +85,25 @@ describe('live ThinkingPanel', () => {
     expect(document.querySelector('.thinking-panel')).toBeNull();
   });
 
+  it('keeps the streaming answer draft inside the thinking body', () => {
+    panel({
+      text: 'Reasoning line.',
+      output: 'Draft answer still streaming.',
+      placeholder: '',
+    });
+
+    expect(screen.getByText('Reasoning line.')).toBeInTheDocument();
+    expect(screen.getByText('Draft answer still streaming.')).toBeInTheDocument();
+    expect(document.querySelector('.thinking-panel-output')).toBeInTheDocument();
+    expect(document.querySelector('.streaming-text')).toBeNull();
+  });
+
+  it('renders the panel for an output-only stream even without reasoning', () => {
+    panel({ text: '', output: 'Answer draft.', placeholder: '' });
+    expect(screen.getByText('Answer draft.')).toBeInTheDocument();
+    expect(document.querySelector('.thinking-panel')).toBeInTheDocument();
+  });
+
   it('keeps the toggle wired to the caller handler', () => {
     let toggles = 0;
     panel({ onToggle: () => { toggles += 1; } });
