@@ -137,6 +137,8 @@ function MainApp({ theme, setTheme }) {
   const [streamingThinking, setStreamingThinking] = useState("");
   const streamingThinkingRef = useRef("");
   const thinkingStartedAtRef = useRef(0);
+  const liveThinkingStartedAtRef = useRef(0);
+  const [thinkingElapsedMs, setThinkingElapsedMs] = useState(0);
   const [isThinkingOpen, setIsThinkingOpen] = useState(true);
   const [streamingSessionId, setStreamingSessionId] = useState(null);
   const [streamingSpeaker, setStreamingSpeaker] = useState(null);
@@ -245,6 +247,30 @@ function MainApp({ theme, setTheme }) {
     : conversationDraft || DEFAULT_CONVERSATION_PERSONAS;
   const conversationTyping =
     conversationMode && isThinking && !String(streamingContent || "").trim();
+
+  const liveThinkingChars =
+    String(streamingThinking || "").length +
+    String(streamingContent || "").length;
+  const liveThinkingTokens = liveThinkingChars / 4;
+  const liveThinkingRate =
+    thinkingElapsedMs > 0
+      ? liveThinkingTokens / (thinkingElapsedMs / 1000)
+      : 0;
+
+  useEffect(() => {
+    if (!isThinking) {
+      liveThinkingStartedAtRef.current = 0;
+      setThinkingElapsedMs(0);
+      return undefined;
+    }
+    liveThinkingStartedAtRef.current = Date.now();
+    setThinkingElapsedMs(0);
+    const timer = setInterval(() => {
+      if (!liveThinkingStartedAtRef.current) return;
+      setThinkingElapsedMs(Date.now() - liveThinkingStartedAtRef.current);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [isThinking]);
 
   useEffect(() => {
     setActiveView(isSitesView ? "sites" : "chat");
@@ -676,6 +702,8 @@ function MainApp({ theme, setTheme }) {
                               onToggle={() => setIsThinkingOpen((prev) => !prev)}
                               bodyId="corez-thinking-body"
                               placeholder={t("common.thinking.working")}
+                              elapsedMs={thinkingElapsedMs}
+                              tokensPerSecond={liveThinkingRate}
                             />
                           )}
                           {conversationMode && streamingContent && (

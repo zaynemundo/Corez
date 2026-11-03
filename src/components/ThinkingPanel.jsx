@@ -130,7 +130,29 @@ function ThinkingBody({ text }) {
  * @param {string} [props.output] The answer draft while it is streaming. It is
  *   kept inside the thinking panel until the turn completes, then the finished
  *   message is rendered normally in the transcript.
+ * @param {number} [props.elapsedMs] Live elapsed time while the model works.
+ * @param {number} [props.tokensPerSecond] Live throughput estimate. The
+ *   provider only reports exact usage at completion, so this is marked with
+ *   "~" and derived from streamed characters.
  */
+function formatElapsed(ms) {
+  const total = Math.max(0, Math.floor(Number(ms || 0) / 1000));
+  if (total < 60) return `${total}s`;
+  const minutes = Math.floor(total / 60);
+  const seconds = total % 60;
+  if (minutes < 60) {
+    return `${minutes}m ${String(seconds).padStart(2, "0")}s`;
+  }
+  const hours = Math.floor(minutes / 60);
+  return `${hours}h ${String(minutes % 60).padStart(2, "0")}m`;
+}
+
+function formatRate(tokensPerSecond) {
+  const rate = Number(tokensPerSecond);
+  if (!Number.isFinite(rate) || rate <= 0) return "~0 tok/s";
+  return `~${rate >= 10 ? Math.round(rate) : rate.toFixed(1)} tok/s`;
+}
+
 export function ThinkingPanel({
   text,
   seconds = 0,
@@ -140,6 +162,8 @@ export function ThinkingPanel({
   live = false,
   placeholder = "",
   output = "",
+  elapsedMs = 0,
+  tokensPerSecond = 0,
 }) {
   const { t } = useI18n();
   const value = typeof text === "string" ? text.trim() : "";
@@ -163,6 +187,11 @@ export function ThinkingPanel({
       >
         <span className="thinking-panel-logo" aria-hidden="true" />
         <span className="thinking-panel-title">{label}</span>
+        {live && (
+          <span className="thinking-panel-metrics" aria-hidden="true">
+            {formatRate(tokensPerSecond)} · {formatElapsed(elapsedMs)}
+          </span>
+        )}
         {waiting && (
           <span className="thinking-panel-status" role="status">
             {placeholder}

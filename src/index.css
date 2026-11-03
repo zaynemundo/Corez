@@ -2864,6 +2864,19 @@ h6 {
   letter-spacing: 0.01em;
 }
 
+/* Live throughput/elapsed readout: reassures the user that the model is still
+   producing tokens instead of appearing frozen. The provider only reports
+   exact usage at completion, so the rate is intentionally prefixed with "~". */
+.thinking-panel-metrics {
+  color: var(--text-secondary);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.66rem;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+  white-space: nowrap;
+  opacity: 0.7;
+}
+
 /* Live status while the model works and no reasoning has streamed yet
    ("Workingâ€¦"). Replaced by the reasoning text the moment it arrives; a soft
    pulse keeps the header visibly alive during that wait. */

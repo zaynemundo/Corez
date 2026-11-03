@@ -104,6 +104,20 @@ describe('live ThinkingPanel', () => {
     expect(document.querySelector('.thinking-panel')).toBeInTheDocument();
   });
 
+  it('shows live throughput and elapsed time while the model works', () => {
+    panel({
+      text: 'Reasoning.',
+      elapsedMs: 65_000,
+      tokensPerSecond: 12.4,
+    });
+    expect(screen.getByText('~12 tok/s · 1m 05s')).toBeInTheDocument();
+  });
+
+  it('shows zero throughput before the first token arrives', () => {
+    panel({ text: '', elapsedMs: 1_500, tokensPerSecond: 0 });
+    expect(screen.getByText('~0 tok/s · 1s')).toBeInTheDocument();
+  });
+
   it('keeps the toggle wired to the caller handler', () => {
     let toggles = 0;
     panel({ onToggle: () => { toggles += 1; } });
