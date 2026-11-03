@@ -598,6 +598,9 @@ export async function generateHostedAIResponse(
       project: persistedProjectState || undefined,
       stream: options.stream === true,
       harness: useCreationHarness,
+      ...(options.resumeThinking
+        ? { resumeThinking: String(options.resumeThinking) }
+        : {}),
     }),
   };
   if (signal) fetchOptions.signal = signal;
@@ -922,14 +925,22 @@ export async function generateAIResponse(
     buildInProgressDelaysMs,
   } = resolvePersistentRetryOpts(retryOpts);
 
-  const buildHostedStreamOpts = () => ({
-    stream: typeof onDelta === "function",
-    onDelta,
-    onPhase,
-    onClear,
-    ...(typeof onThinking === "function" ? { onThinking } : {}),
-    ...(innerRetryDelaysMs ? { retryDelaysMs: innerRetryDelaysMs } : {}),
-  });
+  const buildHostedStreamOpts = () => {
+    const resumeThinking =
+      retryOpts.resumeThinking &&
+      typeof retryOpts.resumeThinking === "object"
+        ? retryOpts.resumeThinking.text
+        : retryOpts.resumeThinking;
+    return {
+      stream: typeof onDelta === "function",
+      onDelta,
+      onPhase,
+      onClear,
+      ...(typeof onThinking === "function" ? { onThinking } : {}),
+      ...(innerRetryDelaysMs ? { retryDelaysMs: innerRetryDelaysMs } : {}),
+      ...(resumeThinking ? { resumeThinking: String(resumeThinking) } : {}),
+    };
+  };
 
   const callHostedOnce = async (promptToSend) => {
     // The app requests STREAMING responses: the worker answers with SSE

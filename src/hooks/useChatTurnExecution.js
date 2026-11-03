@@ -13,6 +13,12 @@ import {
   persistAssistantTurnAfter,
 } from "../services/turnPersistence";
 import { compactChatMessages, shouldCompact } from "../services/smartCompact";
+import {
+  clearThinkingCheckpoint,
+  createPromptFingerprint,
+  readThinkingCheckpoint,
+  writeThinkingCheckpoint,
+} from "../utils/thinkingCheckpoint";
 
 export function buildAttachmentPrompt(attachments) {
   if (!Array.isArray(attachments) || attachments.length === 0) return "";
@@ -412,10 +418,51 @@ export function useChatTurnExecution({
       ? `${apiPrompt}\n\n[Location context: ${locationContext}]`
       : apiPrompt;
 
+    const checkpointFingerprint = createPromptFingerprint(apiPrompt);
+    const savedCheckpoint = readThinkingCheckpoint(
+      targetSessionId,
+      checkpointFingerprint,
+    );
+    const resumeThinkingRef = {
+      text: savedCheckpoint?.thinking || "",
+    };
+    let checkpointTimer = null;
+    let checkpointCompleted = false;
+    const scheduleCheckpoint = () => {
+      if (!streamingThinkingRef.current || checkpointTimer) return;
+      checkpointTimer = setTimeout(() => {
+        checkpointTimer = null;
+        writeThinkingCheckpoint(targetSessionId, {
+          fingerprint: checkpointFingerprint,
+          thinking: streamingThinkingRef.current,
+        });
+      }, 800);
+    };
+    const flushCheckpoint = () => {
+      if (checkpointTimer) {
+        clearTimeout(checkpointTimer);
+        checkpointTimer = null;
+      }
+      if (!checkpointCompleted && streamingThinkingRef.current) {
+        writeThinkingCheckpoint(targetSessionId, {
+          fingerprint: checkpointFingerprint,
+          thinking: streamingThinkingRef.current,
+        });
+      }
+    };
+
     try {
       setStreamingContent("");
-      setStreamingThinking("");
-      streamingThinkingRef.current = "";
+      if (savedCheckpoint?.thinking) {
+        streamingThinkingRef.current = savedCheckpoint.thinking;
+        setStreamingThinking(savedCheckpoint.thinking);
+        thinkingStartedAtRef.current = Date.now();
+        resumeThinkingRef.text = savedCheckpoint.thinking;
+      } else {
+        setStreamingThinking("");
+        streamingThinkingRef.current = "";
+        thinkingStartedAtRef.current = 0;
+      }
       setIsThinkingOpen(true);
       const response = await generateAIResponse(
         promptForModel,
@@ -429,19 +476,20 @@ export function useChatTurnExecution({
           setBuildPhase(phaseEvent.phase || null);
         },
         () => {
+          // Keep the accumulated thinking on a retry: it is the checkpoint
+          // the next request continues from. Only the answer bubble resets.
           setStreamingContent("");
-          setStreamingThinking("");
-          streamingThinkingRef.current = "";
-          thinkingStartedAtRef.current = 0;
           setIsThinkingOpen(true);
         },
-        {},
+        { resumeThinking: resumeThinkingRef },
         (text) => {
           if (text && !thinkingStartedAtRef.current) {
             thinkingStartedAtRef.current = Date.now();
           }
           streamingThinkingRef.current += text;
+          resumeThinkingRef.text = streamingThinkingRef.current;
           setStreamingThinking(streamingThinkingRef.current);
+          scheduleCheckpoint();
         },
       );
       if (response) {
@@ -518,11 +566,18 @@ export function useChatTurnExecution({
           }),
         );
       }
+      checkpointCompleted = true;
+      if (checkpointTimer) {
+        clearTimeout(checkpointTimer);
+        checkpointTimer = null;
+      }
+      clearThinkingCheckpoint(targetSessionId);
     } catch (err) {
       if (err?.name !== "AbortError") {
         console.error("AI generation error:", err);
       }
     } finally {
+      flushCheckpoint();
       if (abortControllerRef.current === controller) {
         localStorage.removeItem("corez_pending_request");
         setIsThinking(false);

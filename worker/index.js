@@ -46,6 +46,10 @@ import {
 } from "./publishStore.js";
 import { handleImage, handleWorkersAIImage } from "./imageRoutes.js";
 import { buildUrlContextMessage, resolveUrlContext } from "./browse.js";
+import {
+  buildResumeThinkingMessage,
+  normalizeResumeThinking,
+} from "./resumeThinking.js";
 import { handleR2Assets, handleR2Apps } from "./r2Routes.js";
 import { handlePublish } from "./publishRoutes.js";
 import {
@@ -372,6 +376,18 @@ async function handleAi(request, env) {
         role: "system",
         content: buildUrlContextMessage(urlContext),
       });
+    }
+  }
+
+  // A retry after an interrupted reasoning stream can carry the model's own
+  // prior thinking back as internal notes. This is a continuation hint, not
+  // persisted server state: the browser owns the 12h checkpoint.
+  if (uid && !body.titleOnly) {
+    const resumeMessage = buildResumeThinkingMessage(
+      normalizeResumeThinking(body.resumeThinking),
+    );
+    if (resumeMessage) {
+      apiMessages.push({ role: "system", content: resumeMessage });
     }
   }
 

@@ -1,6 +1,13 @@
 import { useEffect, useRef } from "react";
 import { generateAIResponse, extractCodeFromMessage } from "../services/aiService";
 import * as chatService from "../services/chatService";
+import {
+  clearThinkingCheckpoint,
+  createPromptFingerprint,
+  pruneThinkingCheckpoints,
+  readThinkingCheckpoint,
+  writeThinkingCheckpoint,
+} from "../utils/thinkingCheckpoint";
 
 export function usePendingTurnRecovery({
   chatIdFromUrl,
@@ -29,13 +36,15 @@ export function usePendingTurnRecovery({
     if (resumeStartedRef.current) return;
     resumeStartedRef.current = true;
     try {
+      pruneThinkingCheckpoints();
       const savedPending = localStorage.getItem("corez_pending_request");
       if (savedPending) {
         const pendingData = JSON.parse(savedPending);
         if (
           pendingData &&
           pendingData.sessionId &&
-          Date.now() - (pendingData.timestamp || 0) < 300000
+          Date.now() - (pendingData.timestamp || 0) <
+            12 * 60 * 60 * 1000
         ) {
           // Find session — may need to fetch from server if not yet loaded
           const targetSessionId = pendingData.sessionId;
@@ -47,9 +56,45 @@ export function usePendingTurnRecovery({
           setSwarmVisible(false);
           setBuildPhase(null);
           setStreamingSessionId(targetSessionId);
-          setStreamingThinking("");
-          streamingThinkingRef.current = "";
-          thinkingStartedAtRef.current = 0;
+          const checkpointFingerprint = createPromptFingerprint(
+            pendingData.apiPrompt,
+          );
+          const savedCheckpoint = readThinkingCheckpoint(
+            targetSessionId,
+            checkpointFingerprint,
+          );
+          const resumeThinking = {
+            text: savedCheckpoint?.thinking || "",
+          };
+          let checkpointTimer = null;
+          let checkpointCompleted = false;
+          const scheduleCheckpoint = () => {
+            if (!streamingThinkingRef.current || checkpointTimer) return;
+            checkpointTimer = setTimeout(() => {
+              checkpointTimer = null;
+              writeThinkingCheckpoint(targetSessionId, {
+                fingerprint: checkpointFingerprint,
+                thinking: streamingThinkingRef.current,
+              });
+            }, 800);
+          };
+          const flushCheckpoint = () => {
+            if (checkpointTimer) {
+              clearTimeout(checkpointTimer);
+              checkpointTimer = null;
+            }
+            if (!checkpointCompleted && streamingThinkingRef.current) {
+              writeThinkingCheckpoint(targetSessionId, {
+                fingerprint: checkpointFingerprint,
+                thinking: streamingThinkingRef.current,
+              });
+            }
+          };
+          streamingThinkingRef.current = savedCheckpoint?.thinking || "";
+          setStreamingThinking(savedCheckpoint?.thinking || "");
+          thinkingStartedAtRef.current = savedCheckpoint?.thinking
+            ? Date.now()
+            : 0;
           setIsThinkingOpen(true);
           const controller = new AbortController();
           abortControllerRef.current = controller;
@@ -71,13 +116,15 @@ export function usePendingTurnRecovery({
               setBuildPhase(phaseEvent.phase || null);
             },
             null,
-            {},
+            { resumeThinking },
             (text) => {
               if (text && !thinkingStartedAtRef.current) {
                 thinkingStartedAtRef.current = Date.now();
               }
               streamingThinkingRef.current += text;
+              resumeThinking.text = streamingThinkingRef.current;
               setStreamingThinking(streamingThinkingRef.current);
+              scheduleCheckpoint();
             },
           )
             .then((response) => {
@@ -122,6 +169,12 @@ export function usePendingTurnRecovery({
                   content: aiMsg.content,
                 })
                 .catch(() => {});
+              checkpointCompleted = true;
+              if (checkpointTimer) {
+                clearTimeout(checkpointTimer);
+                checkpointTimer = null;
+              }
+              clearThinkingCheckpoint(targetSessionId);
             })
             .catch((err) => {
               if (err?.name !== "AbortError") {
@@ -129,6 +182,7 @@ export function usePendingTurnRecovery({
               }
             })
             .finally(() => {
+              flushCheckpoint();
               localStorage.removeItem("corez_pending_request");
               setIsThinking(false);
               setSwarmVisible(false);
