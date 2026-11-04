@@ -358,7 +358,10 @@ export default function ChatMessage({
                     {tableData.bodyRows.map((row, rIdx) => (
                       <tr key={rIdx}>
                         {tableData.headers.map((_, cIdx) => (
-                          <td key={cIdx}>
+                          <td
+                            key={cIdx}
+                            data-label={tableData.headers[cIdx] || ""}
+                          >
                             {renderInlineFormattedText(row[cIdx] || "")}
                           </td>
                         ))}

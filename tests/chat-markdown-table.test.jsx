@@ -24,7 +24,10 @@ describe('ChatMessage markdown tables', () => {
     const rows = container.querySelectorAll('.markdown-table tbody tr');
     expect(rows).toHaveLength(2);
     rows.forEach((row) => {
-      expect(row.querySelectorAll('td')).toHaveLength(3);
+      const cells = row.querySelectorAll('td');
+      expect(cells).toHaveLength(3);
+      expect(cells[0]).toHaveAttribute('data-label', 'Change');
+      expect(cells[2]).toHaveAttribute('data-label', 'Reason');
     });
     expect(container.textContent).toContain('cw = mmW || 120');
     expect(container.textContent).toContain('a|b');
