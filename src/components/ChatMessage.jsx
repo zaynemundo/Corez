@@ -346,7 +346,12 @@ export default function ChatMessage({
           if (tableData) {
             elements.push(
               <div key={`table-${i}`} className="markdown-table-wrapper">
-                <table className="markdown-table">
+                <table
+                  className={`markdown-table cols-${Math.min(
+                    tableData.headers.length,
+                    6,
+                  )}`}
+                >
                   <thead>
                     <tr>
                       {tableData.headers.map((h, hIdx) => (

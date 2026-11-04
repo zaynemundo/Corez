@@ -21,6 +21,7 @@ describe('ChatMessage markdown tables', () => {
       <ChatMessage message={{ role: 'assistant', content }} />,
     );
 
+    expect(container.querySelector('.markdown-table')).toHaveClass('cols-3');
     const rows = container.querySelectorAll('.markdown-table tbody tr');
     expect(rows).toHaveLength(2);
     rows.forEach((row) => {

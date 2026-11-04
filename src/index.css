@@ -2267,8 +2267,35 @@ h6 {
   width: 100%;
   min-width: 34rem;
   border-collapse: collapse;
+  table-layout: fixed;
   text-align: left;
   font-size: 0.8rem;
+}
+
+/* Fixed column budgets stop long inline-code tokens from squeezing the first
+   column to one character in auto table layout. */
+.markdown-table.cols-2 th:nth-child(1) {
+  width: 32%;
+}
+.markdown-table.cols-2 th:nth-child(2) {
+  width: 68%;
+}
+.markdown-table.cols-3 th:nth-child(1) {
+  width: 22%;
+}
+.markdown-table.cols-3 th:nth-child(2),
+.markdown-table.cols-3 th:nth-child(3) {
+  width: 39%;
+}
+.markdown-table.cols-4 th:nth-child(1) {
+  width: 18%;
+}
+.markdown-table.cols-4 th:nth-child(2),
+.markdown-table.cols-4 th:nth-child(3) {
+  width: 28%;
+}
+.markdown-table.cols-4 th:nth-child(4) {
+  width: 26%;
 }
 
 .markdown-table th {
@@ -2293,7 +2320,8 @@ h6 {
 }
 
 .markdown-table td code {
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
   font-size: 0.9em;
 }
 
