@@ -8,7 +8,7 @@ import {
 } from "../utils/previewTransformer";
 import { publishAppInR2 } from "../services/appStorageService";
 import { useAuth } from "../context/AuthContext";
-import { createZipBlob } from "../utils/zipPackager";
+import { createZipBlob } from "@corez_ai/shared/artifacts";
 import { repairMalformedHtml } from "../utils/htmlRepair";
 import { printHtmlDocument } from "../utils/printDocument";
 import { inlinePreviewAssets } from "../utils/previewAssets";

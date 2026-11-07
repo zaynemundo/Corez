@@ -7,17 +7,20 @@
     "node": ">=22.13.0"
   },
   "scripts": {
-    "start": "expo start",
-    "android": "expo run:android",
-    "prebuild": "expo prebuild --platform android",
+    "start": "node scripts/sync-shared.mjs && expo start",
+    "android": "node scripts/sync-shared.mjs && expo run:android",
+    "prebuild": "node scripts/sync-shared.mjs && expo prebuild --platform android",
     "apk": "npm run prebuild && cd android && gradlew.bat assembleRelease",
-    "test": "jest",
-    "test:watch": "jest --watch",
-    "lint": "expo lint",
-    "typecheck": "tsc --noEmit",
-    "doctor": "expo-doctor"
+    "postinstall": "node scripts/sync-shared.mjs",
+    "test": "node scripts/sync-shared.mjs && jest",
+    "test:watch": "node scripts/sync-shared.mjs && jest --watch",
+    "lint": "node scripts/sync-shared.mjs && expo lint",
+    "typecheck": "node scripts/sync-shared.mjs && tsc --noEmit",
+    "doctor": "expo-doctor",
+    "sync-shared": "node scripts/sync-shared.mjs"
   },
   "dependencies": {
+    "@corez_ai/shared": "file:../packages/corez-shared",
     "@expo-google-fonts/jetbrains-mono": "0.4.1",
     "@expo-google-fonts/outfit": "0.4.3",
     "@shopify/flash-list": "2.3.2",

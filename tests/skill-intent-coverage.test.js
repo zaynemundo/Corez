@@ -14,8 +14,8 @@
 
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { resolveSkills, SPECIALIST_SKILL_IDS } from '../src/skills/resolver.js';
-import { classifyIntent } from '../src/services/intentClassifier.js';
+import { resolveSkills, SPECIALIST_SKILL_IDS } from '@corez_ai/shared/intent';
+import { classifyPublicIntent as classifyIntent } from '@corez_ai/shared/intent';
 
 /** One natural user phrasing per specialist skill. */
 const NATURAL_PROMPTS = {
@@ -50,7 +50,7 @@ function routedIds(prompt, intent = 'general') {
 
 describe('specialist trigger table integrity', () => {
   it('has exactly one pattern per specialist skill and no dead entries', () => {
-    const src = readFileSync('src/skills/resolver.js', 'utf8');
+    const src = readFileSync('packages/corez-shared/src/intent/skills/resolver.js', 'utf8');
     const start = src.indexOf('const SPECIALIST_TRIGGER_PATTERNS');
     const end = src.indexOf('function matchSpecialistSkills', start);
     const block = src.slice(start, end);

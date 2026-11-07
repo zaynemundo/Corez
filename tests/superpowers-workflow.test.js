@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { defaultSkillRegistry, SkillRegistry } from '../src/skills/registry.js';
-import { resolveSkills } from '../src/skills/resolver.js';
-import { expandDependencies } from '../src/skills/dependencies.js';
+import { defaultSkillRegistry, SkillRegistry } from '@corez_ai/shared/intent';
+import { resolveSkills } from '@corez_ai/shared/intent';
+import { expandDependencies } from '@corez_ai/shared/intent';
 import { CapabilityRegistry } from '../src/orchestration/capabilityRegistry.js';
 import { WorkflowState, WORKFLOW_STAGES } from '../src/orchestration/workflowState.js';
 import { SuperpowersWorkflowEngine, classifyTaskCategory } from '../src/orchestration/workflowEngine.js';

@@ -13,12 +13,39 @@ the Capacitor shell in `android/` (see [MOBILE.md](./MOBILE.md)) is legacy.
 | Bearer-token auth in `worker/auth.js` (login/signup/refresh, `/api/auth/me`) | Done, unit-tested |
 | API client, SSE parser (`delta`/`thinking`/`phase`/`done`/`error`), turn transport | Done, unit-tested |
 | Login, sign-up, session gate, chat preview, settings | Done |
+| Shared logic extracted to `packages/corez-shared` (intent, skills, i18n, PDF/ZIP byte builders) | Done, web + mobile import the same modules |
+| Mobile sends the same client-side intent classification as the web | Done |
 | Android bundle (`expo export --platform android`) | Passes |
 | `expo prebuild --platform android` | Passes |
 | Release APK build + on-device spike | **Blocked on a JDK and a device** (below) |
 
 The on-device spike is the Phase 0 go/no-go gate: it must prove bearer login,
 live SSE streaming, abort, and the release APK build before Phase 1 starts.
+
+## Shared package (`packages/corez-shared`)
+
+Pure logic used by both clients, imported by bare specifier:
+
+- `@corez_ai/shared/intent` — trained public classifier, pattern/context intent
+  engine, contract generation, skill registry and resolver, execution modes.
+- `@corez_ai/shared/intent/model` — the committed classifier model as an ES
+  module (the JSON artifact remains the reviewable source; a test pins them
+  equal).
+- `@corez_ai/shared/intent/userFacts` — volunteered identity-fact extraction.
+- `@corez_ai/shared/i18n` — the English/Arabic dictionaries and lookup logic
+  (the web's `src/i18n/dictionaries.js` is now a re-export shim).
+- `@corez_ai/shared/artifacts` — PDF and ZIP builders. Bytes
+  (`buildResearchPdfBytes`, `createZipBytes`) are canonical because React
+  Native has no Blob; the browser wrappers (`buildResearchPdfBlob`,
+  `createZipBlob`) call them.
+
+`mobile/scripts/sync-shared.mjs` copies the package into
+`mobile/node_modules/@corez_ai/shared` on install and before every mobile
+build/test command. npm links a Windows junction for `file:` dependencies and
+Metro 0.87 cannot follow it consistently (the package entry loads, but relative
+imports inside it miss Metro's file map), so mobile uses a real copy of the same
+files. The canonical files stay in `packages/corez-shared`.
+
 
 ## Why bearer tokens
 
@@ -34,6 +61,7 @@ response is unchanged.
 ```powershell
 cd mobile
 npm install
+npm run sync-shared    # after editing packages/corez-shared (also runs pre-build)
 npm run typecheck      # tsc --noEmit
 npm test               # Jest (jest-expo)
 npm run lint           # expo lint

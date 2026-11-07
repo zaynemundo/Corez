@@ -2,7 +2,8 @@ import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { classifyIntent, tokenize } from '../src/services/intentClassifier.js';
+import { classifyPublicIntent as classifyIntent, tokenize } from '@corez_ai/shared/intent';
+import runtimeModel from '@corez_ai/shared/intent/model';
 import { analyzePublicUserIntent } from '../src/services/aiService.js';
 import {
   trainModel,
@@ -20,8 +21,17 @@ function loadDataset() {
 }
 
 function loadCommittedModel() {
-  return JSON.parse(fs.readFileSync(path.join(ROOT, 'src', 'data', 'intent-classifier-model.json'), 'utf8'));
+  return JSON.parse(fs.readFileSync(path.join(ROOT, 'packages', 'corez-shared', 'src', 'intent', 'intent-classifier-model.json'), 'utf8'));
 }
+
+describe('committed model artifacts', () => {
+  // The runtime imports the JS module (Metro/Vite/Node all accept it); the
+  // JSON stays the reviewable artifact the trainer writes. A drift between the
+  // two would mean the app runs a model reviewers never saw.
+  it('runtime JS module is byte-equal to the JSON artifact', () => {
+    expect(runtimeModel).toEqual(loadCommittedModel());
+  });
+});
 
 describe('intent tokenizer (v2)', () => {
   it('training and runtime tokenizers stay identical', () => {

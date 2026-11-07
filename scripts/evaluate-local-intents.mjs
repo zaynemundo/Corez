@@ -10,7 +10,7 @@ const ROOT_DIR = path.resolve(__dirname, '..');
 
 function runEvaluator() {
   const datasetPath = path.join(ROOT_DIR, 'data', 'intents-dataset.json');
-  const modelPath = path.join(ROOT_DIR, 'src', 'data', 'intent-classifier-model.json');
+  const modelPath = path.join(ROOT_DIR, 'packages', 'corez-shared', 'src', 'intent', 'intent-classifier-model.json');
 
   if (!fs.existsSync(datasetPath)) {
     console.error(`Dataset not found at ${datasetPath}`);

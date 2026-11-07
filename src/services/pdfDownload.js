@@ -9,7 +9,7 @@
  * builder the document uses (src/services/pdfBuilder.js), so both paths
  * produce byte-identical PDFs.
  */
-import { buildResearchPdfBlob, reportFileName } from "./pdfBuilder.js";
+import { buildResearchPdfBlob, reportFileName } from "@corez_ai/shared/artifacts";
 
 // The wrapper injects the widths table into the document; the module keeps its
 // own copy for chat-side builds. Kept in sync with pdfGenerator.js.

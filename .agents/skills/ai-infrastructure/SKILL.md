@@ -48,7 +48,7 @@ disableable per deployment with `WORKERS_AI_RERANK_DISABLED=true` /
 
 ## 1. Model Routing & Primary/Secondary Failovers
 
-- **Routing Logic**: Direct fast structured classification tasks to lightweight local logic (e.g. the repo's `src/services/intentClassifier.js`) and complex reasoning/art direction to the primary model (Muse Spark 1.3 Contributor, `muse-spark-1.3-contributor`).
+- **Routing Logic**: Direct fast structured classification tasks to lightweight local logic (e.g. the repo's `packages/corez-shared/src/intent/intentClassifier.js`) and complex reasoning/art direction to the primary model (Muse Spark 1.3 Contributor, `muse-spark-1.3-contributor`).
 - **Graceful Failover**: chat uses OpenCode Go only
   (`OPENCODE_GO_API_KEY`, `worker/providerChain.js`) — there is no DeepSeek or
   OpenRouter text fallback. Transient failures use bounded per-request retries

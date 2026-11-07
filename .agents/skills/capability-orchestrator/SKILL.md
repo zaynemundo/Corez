@@ -63,7 +63,7 @@ Use this skill to analyze incoming user requests, determine the minimal required
 ## 2. Orchestration Strategy
 
 1. **Minimal Surface**: Activate only the skills directly required for the request (use `§1.1` for design) to conserve context budget and latency. `game-development` is a router — load only the `parts/` and `reference/` files the current stage needs, never the whole pipeline.
-2. **Provider-aware routing**: Fast structured classification → local `src/services/intentClassifier.js`. Complex reasoning/art direction → `opencode-go/muse-spark-1.3-contributor` via the chain in `ai-infrastructure: §1`.
+2. **Provider-aware routing**: Fast structured classification → local `packages/corez-shared/src/intent/intentClassifier.js`. Complex reasoning/art direction → `opencode-go/muse-spark-1.3-contributor` via the chain in `ai-infrastructure: §1`.
 3. **Subagent Delegation**: Delegate broad research tasks to the `research` subagent (or the `research-current-information` skill when live web research is required) to keep context clean.
 4. **Strict Policy Compliance**: Enforce `cursor-security-rules` (canonical security) and git completion policies (`git-superpowers`) upon finishing file modifications. Backend work must also satisfy `backend-architecture: Level 1`.
 5. **Verification**: End every implementation with `verify` checks (`npm test`, `npm run lint`, `npm run build`, `npm run test:cloudflare`) — see `software-engineering: §4` for canonical commands.

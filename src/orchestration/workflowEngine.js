@@ -4,9 +4,11 @@
  * implementation task DAGs, fresh context subagent briefs, review gates, and verification evidence gates.
  */
 
-import { classifyIntent } from "../services/intentClassifier.js";
-import { resolveSkills } from "../skills/resolver.js";
-import { defaultSkillRegistry } from "../skills/registry.js";
+import {
+  classifyPublicIntent,
+  defaultSkillRegistry,
+  resolveSkills,
+} from "@corez_ai/shared/intent";
 import { WorkflowState, WORKFLOW_STAGES } from "./workflowState.js";
 import { defaultCapabilityRegistry } from "./capabilityRegistry.js";
 
@@ -49,7 +51,7 @@ export class SuperpowersWorkflowEngine {
 
     try {
       // 1. Intent Classification
-      const intentResult = classifyIntent(userPrompt);
+      const intentResult = classifyPublicIntent(userPrompt);
       // A rejected classification is not a label. `classifyIntent` returns the
       // argmax label even when it rejects the input (out-of-vocabulary or
       // low-confidence), so gibberish reads as `app` — and reading `.label`

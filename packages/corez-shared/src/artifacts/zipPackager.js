@@ -21,11 +21,26 @@ export function computeCrc32(bytes) {
 }
 
 /**
- * Creates a standard ZIP Blob containing multiple files.
- * @param {Array<{ name: string, content: string | Uint8Array }>} files
- * @returns {Blob}
+ * Concatenate Uint8Array parts into one byte array. React Native has no Blob,
+ * so the bytes are canonical and the web wraps them.
  */
-export function createZipBlob(files = []) {
+function concatZipBytes(parts) {
+  const total = parts.reduce((sum, part) => sum + part.length, 0);
+  const out = new Uint8Array(total);
+  let offset = 0;
+  for (const part of parts) {
+    out.set(part, offset);
+    offset += part.length;
+  }
+  return out;
+}
+
+/**
+ * Creates a standard ZIP archive as bytes containing multiple files.
+ * @param {Array<{ name: string, content: string | Uint8Array }>} files
+ * @returns {Uint8Array}
+ */
+export function createZipBytes(files = []) {
   const encoder = new TextEncoder();
   const fileEntries = [];
 
@@ -123,5 +138,10 @@ export function createZipBlob(files = []) {
 
   parts.push(eocd);
 
-  return new Blob(parts, { type: "application/zip" });
+  return concatZipBytes(parts);
+}
+
+/** Browser wrapper: the same archive as one application/zip Blob. */
+export function createZipBlob(files = []) {
+  return new Blob([createZipBytes(files)], { type: "application/zip" });
 }

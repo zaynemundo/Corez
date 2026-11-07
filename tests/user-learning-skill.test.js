@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
-import { defaultSkillRegistry } from '../src/skills/registry.js';
-import { resolveSkills, SPECIALIST_SKILL_IDS } from '../src/skills/resolver.js';
+import { defaultSkillRegistry } from '@corez_ai/shared/intent';
+import { resolveSkills, SPECIALIST_SKILL_IDS } from '@corez_ai/shared/intent';
 import {
   assertSafeUserId,
   assertSafeText,

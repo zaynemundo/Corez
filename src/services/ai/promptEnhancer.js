@@ -1,4 +1,4 @@
-import { process as processPromptIntelligence } from "../promptIntelligence/index.js";
+import { processPromptPipeline as processPromptIntelligence } from "@corez_ai/shared/intent";
 import { buildAwwwardsDesignPrompt } from "../../../packages/agent-core/context/designTokens.js";
 import { fetchAwwwardsInspiration } from "../inspirationService.js";
 import {

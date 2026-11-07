@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { defaultSkillRegistry } from '../src/skills/registry.js';
-import { resolveSkills, SPECIALIST_SKILL_IDS } from '../src/skills/resolver.js';
+import { defaultSkillRegistry } from '@corez_ai/shared/intent';
+import { resolveSkills, SPECIALIST_SKILL_IDS } from '@corez_ai/shared/intent';
 
 const scenarios = [
   { id: 'research-report', prompt: 'Write me a research report on AI in healthcare, citing sources' },

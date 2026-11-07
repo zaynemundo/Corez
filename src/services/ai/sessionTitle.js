@@ -1,4 +1,4 @@
-import { classifyIntent as classifyIntentNew } from "../promptIntelligence/index.js";
+import { classifyIntent as classifyIntentNew } from "@corez_ai/shared/intent";
 import { AI_PROXY_ENDPOINT, parseSlashCommand } from "../aiService.js";
 import { IMAGE_REQUEST_TAIL } from "./imagePipeline.js";
 

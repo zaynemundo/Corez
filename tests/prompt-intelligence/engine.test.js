@@ -6,43 +6,32 @@
 
 import { describe, it, expect } from 'vitest';
 import {
-  createTask,
-  generateTaskId,
-  INTENT_TYPES,
-  COMPLEXITY_LEVELS,
-  EXECUTION_MODES,
-  safeParseJSON,
-  isValidIntent,
-} from '../../src/services/promptIntelligence/schemas.js';
-
-import {
-  classifyIntent,
-  extractRequirements,
-  classifyComplexity,
-  detectMissingInformation,
-} from '../../src/services/promptIntelligence/intentEngine.js';
-
-import {
-  createIntentContract,
-  checkContractViolations,
-} from '../../src/services/promptIntelligence/intentContract.js';
-
-import { ContextEngine } from '../../src/services/promptIntelligence/contextEngine.js';
-
-import {
   architectPrompt,
-  refinePrompt,
-  MIN_PROMPT_SCORE,
+  checkContractViolations,
+  classifyComplexity,
+  classifyIntent,
+  ContextEngine,
+  createIntentContract,
+  createTask,
+  COMPLEXITY_LEVELS,
+  critiquePrompt,
+  deEscalate,
+  detectMissingInformation,
+  EXECUTION_MODES,
+  extractRequirements,
+  generateTaskId,
+  guardIntent,
+  INTENT_TYPES,
+  isValidIntent,
   MAX_REFINEMENT_LOOPS,
-} from '../../src/services/promptIntelligence/promptArchitect.js';
-
-import { critiquePrompt } from '../../src/services/promptIntelligence/promptCritic.js';
-
-import { guardIntent, deEscalate } from '../../src/services/promptIntelligence/intentGuard.js';
-
-import { route, shouldUseFullPipeline, toLegacyIntentType } from '../../src/services/promptIntelligence/taskRouter.js';
-
-import { process } from '../../src/services/promptIntelligence/index.js';
+  MIN_PROMPT_SCORE,
+  processPromptPipeline as process,
+  refinePrompt,
+  route,
+  safeParseJSON,
+  shouldUseFullPipeline,
+  toLegacyIntentType,
+} from '@corez_ai/shared/intent';
 
 // =========================================================================
 // 1. Schemas

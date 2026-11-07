@@ -12,14 +12,15 @@
  * builder consumes) and injects the shared functions into the page.
  */
 import {
-  buildResearchPdfBlob,
+  buildResearchPdfBytes,
+  concatPdfBytes,
   escapePdfText,
   foldToAscii,
   pdfByteLength,
   pdfTextWidth,
   reportFileName,
   wrapPdfText,
-} from "./pdfBuilder.js";
+} from "@corez_ai/shared/artifacts";
 
 /**
  * Build the self-contained HTML document for the preview canvas: a polished
@@ -225,7 +226,8 @@ export function synthesizePdfDocumentHtml({
     pdfByteLength.toString(),
     pdfTextWidth.toString(),
     wrapPdfText.toString(),
-    buildResearchPdfBlob.toString(),
+    concatPdfBytes.toString(),
+    buildResearchPdfBytes.toString(),
     reportFileName.toString(),
   ].join("\n");
 
@@ -314,13 +316,15 @@ export function synthesizePdfDocumentHtml({
   var REPORT_PARAGRAPHS = ${jsParagraphs};
   var HELVETICA_WIDTHS = ${jsWidths};
 
-  // The shared builder (src/services/pdfBuilder.js) is injected above: the
-  // preview's "Download .pdf" button and the chat's one-click download run the
-  // same code, so both produce byte-identical PDFs.
+  // The shared builder (packages/corez-shared/src/artifacts/pdfBuilder.js) is
+  // injected above: the preview's "Download .pdf" button and the chat's
+  // one-click download run the same code, so both produce byte-identical PDFs.
 ${builderSource}
 
-  // Alias kept for callers/tests that exercise the builder by name.
-  function buildPdf(){ return buildResearchPdfBlob(REPORT_TITLE, REPORT_PARAGRAPHS, HELVETICA_WIDTHS); }
+  // Alias kept for callers/tests that exercise the builder by name. The
+  // builder returns bytes (React Native has no Blob), so the browser wraps
+  // them here.
+  function buildPdf(){ return new Blob([buildResearchPdfBytes(REPORT_TITLE, REPORT_PARAGRAPHS, HELVETICA_WIDTHS)], { type: 'application/pdf' }); }
   function downloadPdf(){
     var blob = buildPdf();
     var url = URL.createObjectURL(blob);

@@ -16,8 +16,8 @@ import { readFileSync } from 'node:fs';
 import {
   classifyIntent,
   extractRequirements,
-} from '../../src/services/promptIntelligence/intentEngine.js';
-import { INTENT_TYPES } from '../../src/services/promptIntelligence/schemas.js';
+  INTENT_TYPES,
+} from '@corez_ai/shared/intent';
 
 /**
  * Types deliberately produced by the no-handler fallback rather than a handler.
@@ -29,7 +29,7 @@ const FALLBACK_ONLY = new Set([
 ]);
 
 const ENGINE_SOURCE = readFileSync(
-  'src/services/promptIntelligence/intentEngine.js',
+  'packages/corez-shared/src/intent/promptIntelligence/intentEngine.js',
   'utf8',
 );
 

@@ -21,6 +21,8 @@ Browser (React SPA)  ──/api/*──▶  Cloudflare Worker  ──▶  OpenCo
 |---|---|---|
 | Worker | `worker/entry.js` → `worker/index.js` | HTTP surface, auth gate, provider routing, creation harness, publish store, task queue |
 | Web app | `src/` | Chat, canvas preview, projects/sidebar, settings, i18n (en + ar, RTL), consent |
+| Mobile app | `mobile/` | React Native (Expo) Android client: bearer session, streaming chat, canvas WebView, downloads, deep links. See [docs/MOBILE-RN.md](./docs/MOBILE-RN.md) |
+| Shared logic | `packages/corez-shared/` | Prompt intelligence, skill routing, i18n dictionaries and PDF/ZIP byte builders imported by both clients |
 | Agent core | `packages/agent-core/` | Provider adapters and model ids, swarm orchestrator, design systems, skills |
 | CLI | `packages/cli/` | `corez` commands (plan, build, fix, review, swarm) over the same agent core |
 
@@ -125,3 +127,5 @@ scales concurrency and backs off on HTTP 429.
 | A quota blocks or lets through the wrong thing | `worker/usage.js` |
 | Storage keys or a migration look wrong | `worker/storageKeys.js`, `worker/storageMigrate.js` |
 | Interface copy, layout or direction is wrong | `src/index.css`, `src/i18n/` |
+| A mobile request is unauthenticated or streams nothing | `mobile/src/api/`, `worker/auth.js`, `docs/MOBILE-RN.md` |
+| The native and web classifiers disagree | `packages/corez-shared/src/intent/` |

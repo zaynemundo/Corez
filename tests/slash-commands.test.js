@@ -357,7 +357,16 @@ describe('PDF generator', () => {
     const script = doc.html.match(/<script>([\s\S]*?)<\/script>/)[1];
     let captured = null;
     const blobShim = function (parts) {
-      captured = parts.join('');
+      // The shared builder now returns bytes (React Native has no Blob), so the
+      // browser wrapper hands Blob a Uint8Array. Decode one latin1 char per byte
+      // to reconstruct the same byte string the old string-parts build produced.
+      captured = parts
+        .map((part) => {
+          if (typeof part === 'string') return part;
+          const bytes = part instanceof Uint8Array ? part : new Uint8Array(part);
+          return Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength).toString('latin1');
+        })
+        .join('');
       return { type: 'application/pdf' };
     };
     const api = new Function('Blob', `${script}\n;return { buildPdf };`)(blobShim);

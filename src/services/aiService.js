@@ -24,17 +24,17 @@ export const AI_PROXY_ENDPOINT = "/api/ai";
 const AI_FALLBACK_ENDPOINT = "https://chat.zayne-mayo.workers.dev/api/ai";
 export const IMAGE_PROXY_ENDPOINT = "/api/image";
 
-import { defaultSkillRegistry } from "../skills/registry.js";
-import { classifyIntent } from "./intentClassifier.js";
 import {
-  toLegacyIntentType,
-  classifyIntent as classifyIntentNew,
-  extractRequirements,
   classifyComplexity,
-} from "./promptIntelligence/index.js";
-import { createIntentContract } from "./promptIntelligence/intentContract.js";
-import { resolveSkills } from "../skills/resolver.js";
-import { classifyExecutionMode } from "./executionModes.js";
+  classifyExecutionMode,
+  classifyIntent as classifyIntentNew,
+  classifyPublicIntent,
+  createIntentContract,
+  defaultSkillRegistry,
+  extractRequirements,
+  resolveSkills,
+  toLegacyIntentType,
+} from "@corez_ai/shared/intent";
 import {
   isWebSearchRequest,
   formatSearchResults,
@@ -361,7 +361,7 @@ export function analyzePublicUserIntent(prompt) {
   // fine-grained engine's loose 0.5 gate on multi-intent prompts)
   let modelResult;
   try {
-    modelResult = classifyIntent(cleanPrompt);
+    modelResult = classifyPublicIntent(cleanPrompt);
   } catch {
     modelResult = { accepted: false, confidence: 0 };
   }

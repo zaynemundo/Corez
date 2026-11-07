@@ -3,7 +3,7 @@ import {
   isExplicitWebsiteRequest,
   analyzePublicUserIntent,
 } from '../src/services/aiService.js';
-import { classifyIntent } from '../src/services/promptIntelligence/intentEngine.js';
+import { classifyIntent } from '@corez_ai/shared/intent';
 
 describe('explicit website requests (same rules as @image)', () => {
   it('detects explicit website builds including natural-language phrasing', () => {

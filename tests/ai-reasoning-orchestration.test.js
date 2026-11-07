@@ -18,9 +18,9 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { classifyIntent } from '../src/services/promptIntelligence/intentEngine.js';
-import { createIntentContract } from '../src/services/promptIntelligence/intentContract.js';
-import { resolveSkills } from '../src/skills/resolver.js';
+import { classifyIntent } from '@corez_ai/shared/intent';
+import { createIntentContract } from '@corez_ai/shared/intent';
+import { resolveSkills } from '@corez_ai/shared/intent';
 import { evaluateResponse, repairResponse, recordQualitySignal, getQualityMetrics } from '../src/services/reflectionEngine.js';
 import { improveCodingPrompt } from '../src/services/aiService.js';
 

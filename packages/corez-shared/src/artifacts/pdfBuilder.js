@@ -109,16 +109,36 @@ export function wrapPdfText(t, maxWidth, size, widths) {
 }
 
 /**
- * Build the report PDF as a Blob.
+ * Concatenate encoded PDF chunks into one byte array. React Native has no Blob
+ * constructor, so the bytes are the canonical output and the web wraps them in
+ * a Blob.
+ */
+export function concatPdfBytes(chunks) {
+  const encoder = new TextEncoder();
+  const encoded = chunks.map((chunk) =>
+    typeof chunk === "string" ? encoder.encode(chunk) : chunk,
+  );
+  const total = encoded.reduce((sum, chunk) => sum + chunk.length, 0);
+  const out = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of encoded) {
+    out.set(chunk, offset);
+    offset += chunk.length;
+  }
+  return out;
+}
+
+/**
+ * Build the report PDF as bytes.
  *
  * @param {string} title Report title (folded to ASCII for the filename).
  * @param {Array<{kind: string, text: string}>} paragraphs Structured blocks
  *   from the report body (heading / subheading / bullet / numbered /
  *   paragraph).
  * @param {number[]} widths Helvetica advance widths (ASCII 32..126).
- * @returns {Blob} application/pdf
+ * @returns {Uint8Array} application/pdf bytes
  */
-export function buildResearchPdfBlob(title, paragraphs, widths) {
+export function buildResearchPdfBytes(title, paragraphs, widths) {
   const REPORT_TITLE = String(title || "Untitled");
   const REPORT_PARAGRAPHS = Array.isArray(paragraphs) ? paragraphs : [];
   const HELVETICA_WIDTHS = Array.isArray(widths) ? widths : [];
@@ -235,7 +255,14 @@ export function buildResearchPdfBlob(title, paragraphs, widths) {
   push(
     `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefStart}\n%%EOF`,
   );
-  return new Blob(parts, { type: "application/pdf" });
+  return concatPdfBytes(parts);
+}
+
+/** Browser wrapper: the same bytes as one application/pdf Blob. */
+export function buildResearchPdfBlob(title, paragraphs, widths) {
+  return new Blob([buildResearchPdfBytes(title, paragraphs, widths)], {
+    type: "application/pdf",
+  });
 }
 
 /**

@@ -1,4 +1,4 @@
-import { classifyIntent as classifyIntentNew } from "../promptIntelligence/index.js";
+import { classifyIntent as classifyIntentNew } from "@corez_ai/shared/intent";
 import {
   IMAGE_PROXY_ENDPOINT,
   compactConversationForRequest,

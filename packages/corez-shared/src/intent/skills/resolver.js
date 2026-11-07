@@ -6,7 +6,7 @@
 
 import { defaultSkillRegistry } from "./registry.js";
 import { expandDependencies } from "./dependencies.js";
-import { detectUserFactCandidates } from "../services/userLearningService.js";
+import { detectUserFactCandidates } from "../userFacts.js";
 
 const BUG_REPORT_PATTERNS =
   /\b(crash|crashes|bug|error|exception|fail|failed|fails|stack trace|not working|broken|issue|fix|debug)\b/i;

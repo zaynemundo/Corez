@@ -10,7 +10,7 @@ import { readFileSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { resolveSkills } from '../src/skills/resolver.js';
+import { resolveSkills } from '@corez_ai/shared/intent';
 import { evaluateCase } from '../benchmarks/evaluator-core.js';
 import {
   buildRuntimeContext,

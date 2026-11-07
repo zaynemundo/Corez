@@ -1,4 +1,4 @@
-import model from "../data/intent-classifier-model.json" with { type: "json" };
+import model from "./intent-classifier-model.js";
 
 // Built once at module load: classifyIntent is called several times per
 // message, and rebuilding a Set from 338 vocabulary entries each call was a

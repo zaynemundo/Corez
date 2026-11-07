@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { createZipBlob, computeCrc32 } from '../src/utils/zipPackager.js';
+import { createZipBlob, computeCrc32 } from '@corez_ai/shared/artifacts';
 
 describe('Zero-Dependency ZIP Packager', () => {
   it('computes accurate CRC-32 checksums', () => {

@@ -25,6 +25,10 @@ import {
 } from "@/components/MessageBubble";
 import { SessionGate } from "@/components/SessionGate";
 import { streamChatTurn, type ChatHistoryMessage } from "@/api/ai";
+import {
+  classifyIntent as classifyEngineIntent,
+  classifyPublicIntent,
+} from "@corez_ai/shared/intent";
 import { useAuth } from "@/state/auth";
 import { useTheme } from "@/state/theme";
 import { useI18n } from "@/i18n";
@@ -141,6 +145,12 @@ function ChatView() {
       abortRef.current = controller;
       let thinking = "";
 
+      // Same client-side classification the web sends: the trained public
+      // label decides the legacy intent, the pattern engine supplies the
+      // structured intent the Worker uses for skill routing.
+      const publicIntent = classifyPublicIntent(prompt);
+      const fineIntent = classifyEngineIntent(prompt);
+
       const finish = (patch: Partial<ChatMessageModel>) => {
         const elapsed = Date.now() - startedAtRef.current;
         patchMessage(assistantId, {
@@ -153,7 +163,15 @@ function ChatView() {
 
       try {
         const result = await streamChatTurn(
-          { prompt, messages: history },
+          {
+            prompt,
+            messages: history,
+            intent: {
+              type: publicIntent.label,
+              confidence: publicIntent.confidence,
+            },
+            fineIntent,
+          },
           {
             onDelta: (text) => {
               publishMessages((prev) =>

@@ -44,6 +44,7 @@
     "@capacitor/splash-screen": "^8.0.2",
     "@capacitor/status-bar": "^8.0.4",
     "@cloudflare/puppeteer": "^1.4.0",
+    "@corez_ai/shared": "*",
     "acorn": "^8.17.0",
     "lucide-react": "^0.475.0",
     "pdfjs-dist": "^6.4.299",
