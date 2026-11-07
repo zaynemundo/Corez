@@ -9,7 +9,7 @@
  * Parsing is memoised by content string because streaming re-renders the same
  * growing text; the cache is bounded so a long answer cannot grow it forever.
  */
-import { useEffect, useMemo, useRef, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import {
   Image,
   Linking,
@@ -23,7 +23,8 @@ import * as Clipboard from "expo-clipboard";
 import { marked, type Token } from "marked";
 import { useTheme } from "@/state/theme";
 import { useI18n } from "@/i18n";
-import { apiUrl } from "@/api/client";
+import { resolveAssetUrl } from "@/lib/urls";
+import { ImageFullscreenModal } from "./ImageFullscreenModal";
 
 const MAX_CACHE_ENTRIES = 60;
 const parseCache = new Map<string, Token[]>();
@@ -39,12 +40,9 @@ export function parseMarkdown(content: string): Token[] {
 }
 
 /** Resolve relative asset paths against the API origin. */
-export function resolveMarkdownUrl(href: string): string {
-  const value = String(href || "").trim();
-  if (!value) return value;
-  if (/^(https?:|mailto:|tel:|data:|blob:)/i.test(value)) return value;
-  return apiUrl(value);
-}
+export const resolveMarkdownUrl = resolveAssetUrl;
+
+const ImagePressContext = createContext<((uri: string) => void) | null>(null);
 
 function stripHtml(value: string): string {
   return String(value || "").replace(/<[^>]+>/g, "");
@@ -52,12 +50,21 @@ function stripHtml(value: string): string {
 
 export function MarkdownView({ content }: { content: string }) {
   const tokens = useMemo(() => parseMarkdown(content), [content]);
+  const [fullscreenUri, setFullscreenUri] = useState<string | null>(null);
   return (
-    <View style={styles.container}>
-      {tokens.map((token, index) => (
-        <Block key={`${token.type}-${index}`} token={token} />
-      ))}
-    </View>
+    <ImagePressContext.Provider value={setFullscreenUri}>
+      <View style={styles.container}>
+        {tokens.map((token, index) => (
+          <Block key={`${token.type}-${index}`} token={token} />
+        ))}
+      </View>
+      {fullscreenUri ? (
+        <ImageFullscreenModal
+          uri={fullscreenUri}
+          onClose={() => setFullscreenUri(null)}
+        />
+      ) : null}
+    </ImagePressContext.Provider>
   );
 }
 
@@ -164,6 +171,7 @@ function Block({ token }: { token: Token }) {
 function Inline({ tokens }: { tokens?: Token[] }) {
   const { theme } = useTheme();
   const colors = theme.colors;
+  const onImagePress = useContext(ImagePressContext);
   if (!tokens || tokens.length === 0) return null;
 
   return (
@@ -224,13 +232,19 @@ function Inline({ tokens }: { tokens?: Token[] }) {
             const src = (token as { href?: string }).href || "";
             const alt = (token as { text?: string }).text || "";
             return (
-              <Image
+              <Text
                 key={key}
-                source={{ uri: resolveMarkdownUrl(src) }}
-                style={[styles.image, { borderColor: colors.border }]}
-                resizeMode="contain"
+                onPress={() => onImagePress?.(src)}
+                accessibilityRole="imagebutton"
                 accessibilityLabel={alt}
-              />
+              >
+                <Image
+                  source={{ uri: resolveMarkdownUrl(src) }}
+                  style={[styles.image, { borderColor: colors.border }]}
+                  resizeMode="contain"
+                  accessibilityLabel={alt}
+                />
+              </Text>
             );
           }
           case "br":

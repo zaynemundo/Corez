@@ -19,6 +19,7 @@ the Capacitor shell in `android/` (see [MOBILE.md](./MOBILE.md)) is legacy.
 | Voice dictation: expo-audio recording → `/api/transcribe` (Whisper), en/ar language, 120s cap | Done |
 | Chat management: rename, pin/unpin, delete, pinned/recent sections, title header | Done |
 | Offline read cache: SQLite snapshot of the chat list and open conversation, marked as an offline copy | Done |
+| Image viewer: tap an inline image for fullscreen, native share/save, copy link | Done |
 | Shared logic extracted to `packages/corez-shared` (intent, skills, i18n, PDF/ZIP byte builders) | Done, web + mobile import the same modules |
 | Mobile sends the same client-side intent classification as the web | Done |
 | Android bundle (`expo export --platform android`) | Passes |
@@ -100,12 +101,11 @@ gitignored; configure native behaviour in `app.json` rather than editing it.
 
 ## Prerequisites for the APK spike
 
-1. **JDK 25 (or 21)** — nothing is installed on the current machine
-   (`JAVA_HOME` unset, no `java` on PATH). The generated project runs the
-   Gradle 9.4.1 wrapper, which supports running on JVM 17–26; **JDK 27 is not
-   supported yet**. Install with
-   `winget install --id Microsoft.OpenJDK.25` (or Android Studio's JDK) and set
-   `JAVA_HOME`.
+1. **JDK 25 (or 21)** — the generated project runs the Gradle 9.4.1 wrapper,
+   which supports running on JVM 17–26; **JDK 27 is not supported yet**. Either
+   install `winget install --id Microsoft.OpenJDK.25` and set `JAVA_HOME`, or
+   unpack a portable Temurin JDK 25 under `.tools/` (gitignored) and point
+   `JAVA_HOME` at it for the build command. Do not commit a JDK.
 2. **Android SDK** — already installed at
    `C:\Users\ASUS PC\AppData\Local\Android\Sdk` (`platforms;android-36`,
    `build-tools;36.0.0`, `platform-tools`). React Native 0.88 targets

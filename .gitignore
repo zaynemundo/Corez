@@ -21,3 +21,7 @@ deepseek-harness/
 
 # J-Space ledger (working state)
 .jspace/
+
+# Local toolchain (portable JDK etc.): never commit
+.tools/
+

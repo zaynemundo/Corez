@@ -91,4 +91,13 @@ describe("MarkdownView rendering", () => {
     const tree = JSON.stringify(screen.toJSON());
     expect(tree).toContain("https://corez.pro/api/assets/chart.png");
   });
+
+  it("opens the fullscreen viewer when an image is pressed", async () => {
+    await renderMarkdown("![chart](/api/assets/chart.png)");
+    const pressTargets = screen.getAllByLabelText("chart");
+    await fireEvent.press(pressTargets[0]);
+    expect(screen.getByText("Image preview")).toBeTruthy();
+    expect(screen.getByText("Share")).toBeTruthy();
+    expect(screen.getByText("Copy link")).toBeTruthy();
+  });
 });
