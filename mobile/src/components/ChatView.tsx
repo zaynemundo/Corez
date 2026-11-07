@@ -226,6 +226,23 @@ export function ChatView({ initialChatId }: ChatViewProps) {
       abortRef.current = controller;
       let thinking = "";
       let assistantText = "";
+      // Streaming can emit many deltas per second and every render re-parses
+      // the markdown. Flush the visible content at ~16fps; the final finish()
+      // always writes the exact full text.
+      let flushTimer: ReturnType<typeof setTimeout> | null = null;
+      const scheduleFlush = () => {
+        if (flushTimer) return;
+        flushTimer = setTimeout(() => {
+          flushTimer = null;
+          patchMessage(assistantId, { content: assistantText });
+        }, 60);
+      };
+      const clearFlush = () => {
+        if (flushTimer) {
+          clearTimeout(flushTimer);
+          flushTimer = null;
+        }
+      };
 
       // Same client-side classification the web sends: the trained public
       // label decides the legacy intent, the pattern engine supplies the
@@ -234,8 +251,10 @@ export function ChatView({ initialChatId }: ChatViewProps) {
       const fineIntent = classifyEngineIntent(prompt);
 
       const finish = (patch: Partial<ChatMessageModel>) => {
+        clearFlush();
         const elapsed = Date.now() - startedAtRef.current;
         patchMessage(assistantId, {
+          content: assistantText,
           streaming: false,
           thinking,
           thinkingSeconds: Math.max(0, Math.round(elapsed / 1000)),
@@ -257,13 +276,7 @@ export function ChatView({ initialChatId }: ChatViewProps) {
           {
             onDelta: (text) => {
               assistantText += text;
-              publishMessages((prev) =>
-                prev.map((message) =>
-                  message.id === assistantId
-                    ? { ...message, content: message.content + text }
-                    : message,
-                ),
-              );
+              scheduleFlush();
             },
             onThinking: (text) => {
               thinking += text;
@@ -295,6 +308,7 @@ export function ChatView({ initialChatId }: ChatViewProps) {
           finish({ error: friendlyError(caught) });
         }
       } finally {
+        clearFlush();
         stopTimer();
         setElapsedMs(0);
         setStreaming(false);

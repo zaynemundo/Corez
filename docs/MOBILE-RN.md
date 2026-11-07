@@ -14,6 +14,7 @@ the Capacitor shell in `android/` (see [MOBILE.md](./MOBILE.md)) is legacy.
 | API client, SSE parser (`delta`/`thinking`/`phase`/`done`/`error`), turn transport | Done, unit-tested |
 | Login, sign-up, session gate, chat preview, settings | Done |
 | Chat persistence: create/list/load conversations, append user + assistant messages, history sheet | Done |
+| Markdown rendering: headings, lists, tables, fenced code with copy, links, inline images | Done |
 | Shared logic extracted to `packages/corez-shared` (intent, skills, i18n, PDF/ZIP byte builders) | Done, web + mobile import the same modules |
 | Mobile sends the same client-side intent classification as the web | Done |
 | Android bundle (`expo export --platform android`) | Passes |
@@ -121,10 +122,9 @@ gitignored; configure native behaviour in `app.json` rather than editing it.
 
 ## Known limitations at this stage
 
-- Plain-text rendering only; markdown, code blocks, attachments, dictation,
+- Attachments (camera/gallery/files), voice dictation, image-generation UI,
   canvas preview, publishing, downloads, deep links and push are still to come.
+- Markdown rendering covers the answer format but not the web's one-click
+  code-file save/download actions.
 - The history sheet lists conversations and opens them; rename, pin, delete and
   project folders are the next persistence increment.
-- The shared prompt-intelligence/skills package is wired into the turn body
-  (`intent`, `fineIntent`); the web's richer `contract`/`skills`/`executionPlan`
-  fields still need their client-side builders ported for full parity.

@@ -7,6 +7,7 @@
  */
 import { StyleSheet, Text, View } from "react-native";
 import { ThinkingPanel } from "./ThinkingPanel";
+import { MarkdownView } from "./MarkdownView";
 import { useTheme } from "@/state/theme";
 import { useI18n } from "@/i18n";
 
@@ -84,15 +85,7 @@ export function MessageBubble({
         />
       ) : null}
       {message.content ? (
-        <Text
-          selectable
-          style={[styles.assistantText, { color: colors.textPrimary }]}
-        >
-          {message.content}
-          {message.streaming ? (
-            <Text style={{ color: colors.textMuted }}> ▍</Text>
-          ) : null}
-        </Text>
+        <MarkdownView content={message.content} />
       ) : message.streaming ? null : (
         <Text style={[styles.assistantText, { color: colors.textMuted }]}>
           {t("chat.error.empty")}
