@@ -63,6 +63,7 @@ export function ChatView({ initialChatId }: ChatViewProps) {
   const colors = theme.colors;
 
   const [chatId, setChatId] = useState<string | null>(initialChatId ?? null);
+  const [chatTitle, setChatTitle] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessageModel[]>([]);
   const messagesRef = useRef<ChatMessageModel[]>([]);
   const [input, setInput] = useState("");
@@ -134,6 +135,7 @@ export function ChatView({ initialChatId }: ChatViewProps) {
       try {
         const detail = await getChat(id);
         if (seq !== loadSeqRef.current) return;
+        setChatTitle(detail.title || null);
         publishMessages(
           (detail.messages || [])
             .filter((message) => message.role !== "system")
@@ -181,6 +183,7 @@ export function ChatView({ initialChatId }: ChatViewProps) {
     if (!initialChatId) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setChatId(null);
+      setChatTitle(null);
       publishMessages([]);
       setLoadingChat(false);
       setLoadError(null);
@@ -479,9 +482,18 @@ export function ChatView({ initialChatId }: ChatViewProps) {
         </Pressable>
         <View style={styles.headerText}>
           <Text style={[styles.brand, { color: colors.textPrimary }]}>COREZ</Text>
-          <Text style={[styles.previewTag, { color: colors.textMuted }]}>
-            {t("common.chat.mobileTag")}
-          </Text>
+          {chatTitle ? (
+            <Text
+              numberOfLines={1}
+              style={[styles.chatTitle, { color: colors.textSecondary }]}
+            >
+              {chatTitle}
+            </Text>
+          ) : (
+            <Text style={[styles.previewTag, { color: colors.textMuted }]}>
+              {t("common.chat.mobileTag")}
+            </Text>
+          )}
         </View>
         <Pressable
           accessibilityRole="button"
@@ -623,6 +635,13 @@ export function ChatView({ initialChatId }: ChatViewProps) {
           setAttachmentError(null);
           router.replace("/chat");
         }}
+        onDeleted={(deletedId) => {
+          if (deletedId !== chatId) return;
+          setChatId(null);
+          setChatTitle(null);
+          publishMessages([]);
+          router.replace("/chat");
+        }}
       />
     </KeyboardAvoidingView>
   );
@@ -640,9 +659,15 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   headerText: {
+    flex: 1,
+    minWidth: 0,
     flexDirection: "row",
     alignItems: "baseline",
     gap: 10,
+  },
+  chatTitle: {
+    flexShrink: 1,
+    fontSize: 13,
   },
   headerButton: {
     minWidth: 44,

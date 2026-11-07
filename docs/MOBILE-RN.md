@@ -1,4 +1,4 @@
-# CoreZ Mobile (React Native)
+﻿# CoreZ Mobile (React Native)
 
 The native Android client lives in `mobile/` and is built with Expo SDK 58
 (React Native 0.88, React 19.3, TypeScript). It talks to the same Cloudflare
@@ -16,7 +16,7 @@ the Capacitor shell in `android/` (see [MOBILE.md](./MOBILE.md)) is legacy.
 | Chat persistence: create/list/load conversations, append user + assistant messages, history sheet | Done |
 | Markdown rendering: headings, lists, tables, fenced code with copy, links, inline images | Done |
 | Attachments: camera/gallery/files, R2 upload, vision-shaped API attachments, user-bubble previews | Done |
-| Voice dictation: expo-audio recording → `/api/transcribe` (Whisper), en/ar language, 120s cap | Done |
+| Voice dictation: expo-audio recording â†’ `/api/transcribe` (Whisper), en/ar language, 120s cap | Done |
 | Shared logic extracted to `packages/corez-shared` (intent, skills, i18n, PDF/ZIP byte builders) | Done, web + mobile import the same modules |
 | Mobile sends the same client-side intent classification as the web | Done |
 | Android bundle (`expo export --platform android`) | Passes |
@@ -30,15 +30,15 @@ live SSE streaming, abort, and the release APK build before Phase 1 starts.
 
 Pure logic used by both clients, imported by bare specifier:
 
-- `@corez_ai/shared/intent` — trained public classifier, pattern/context intent
+- `@corez_ai/shared/intent` â€” trained public classifier, pattern/context intent
   engine, contract generation, skill registry and resolver, execution modes.
-- `@corez_ai/shared/intent/model` — the committed classifier model as an ES
+- `@corez_ai/shared/intent/model` â€” the committed classifier model as an ES
   module (the JSON artifact remains the reviewable source; a test pins them
   equal).
-- `@corez_ai/shared/intent/userFacts` — volunteered identity-fact extraction.
-- `@corez_ai/shared/i18n` — the English/Arabic dictionaries and lookup logic
+- `@corez_ai/shared/intent/userFacts` â€” volunteered identity-fact extraction.
+- `@corez_ai/shared/i18n` â€” the English/Arabic dictionaries and lookup logic
   (the web's `src/i18n/dictionaries.js` is now a re-export shim).
-- `@corez_ai/shared/artifacts` — PDF and ZIP builders. Bytes
+- `@corez_ai/shared/artifacts` â€” PDF and ZIP builders. Bytes
   (`buildResearchPdfBytes`, `createZipBytes`) are canonical because React
   Native has no Blob; the browser wrappers (`buildResearchPdfBlob`,
   `createZipBlob`) call them.
@@ -99,16 +99,16 @@ gitignored; configure native behaviour in `app.json` rather than editing it.
 
 ## Prerequisites for the APK spike
 
-1. **JDK 21** — nothing is installed on the current machine
+1. **JDK 21** â€” nothing is installed on the current machine
    (`JAVA_HOME` unset, no `java` on PATH). Install Android Studio's JDK or
    `winget install --id Microsoft.OpenJDK.21`, then set `JAVA_HOME`.
-2. **Android SDK** — already installed at
+2. **Android SDK** â€” already installed at
    `C:\Users\ASUS PC\AppData\Local\Android\Sdk` (`platforms;android-36`,
    `build-tools;36.0.0`, `platform-tools`).
-3. **A device or emulator** — no emulator/system image is installed; a physical
+3. **A device or emulator** â€” no emulator/system image is installed; a physical
    phone over USB debugging is the fastest path. `adb` lives in the SDK's
    `platform-tools`.
-4. **Keystore** — for a release APK, generate `corez-mobile-release.jks` and a
+4. **Keystore** â€” for a release APK, generate `corez-mobile-release.jks` and a
    gitignored `android/keystore.properties`, or use `assembleDebug` for the
    spike. Never commit either.
 
@@ -116,11 +116,11 @@ gitignored; configure native behaviour in `app.json` rather than editing it.
 
 1. `./gradlew.bat assembleRelease` exits 0 and produces the APK.
 2. Install and launch; the splash hides into the login screen.
-3. Sign in with a real account — no cookie, bearer token stored in Keystore.
-4. Send "hello" — answer text streams token-by-token; thinking events render;
+3. Sign in with a real account â€” no cookie, bearer token stored in Keystore.
+4. Send "hello" â€” answer text streams token-by-token; thinking events render;
    Stop aborts.
-5. Kill and relaunch — the session survives (token restored).
-6. Sign out — token cleared, login screen returns.
+5. Kill and relaunch â€” the session survives (token restored).
+6. Sign out â€” token cleared, login screen returns.
 
 ## Known limitations at this stage
 
@@ -131,5 +131,5 @@ gitignored; configure native behaviour in `app.json` rather than editing it.
   ported yet.
 - Markdown rendering covers the answer format but not the web's one-click
   code-file save/download actions.
-- The history sheet lists conversations and opens them; rename, pin, delete and
-  project folders are the next persistence increment.
+- The history sheet now renames, pins and deletes conversations; project folders and
+  offline read cache are the next persistence increment.

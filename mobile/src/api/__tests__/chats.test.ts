@@ -5,6 +5,7 @@ import {
   getChat,
   listChats,
   patchChatTitle,
+  setChatPinned,
 } from "../chats";
 import { requestJson } from "../client";
 
@@ -72,6 +73,12 @@ describe("chat persistence API", () => {
     expect(requestMock).toHaveBeenCalledWith("/api/chats/c4", {
       method: "PATCH",
       body: { title: "New title" },
+    });
+
+    await setChatPinned("c4", true);
+    expect(requestMock).toHaveBeenCalledWith("/api/chats/c4", {
+      method: "PATCH",
+      body: { pinned: true },
     });
   });
 

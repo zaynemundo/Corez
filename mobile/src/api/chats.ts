@@ -88,6 +88,16 @@ export async function patchChatTitle(
   );
 }
 
+export async function setChatPinned(
+  chatId: string,
+  pinned: boolean,
+): Promise<void> {
+  await requestJson<{ success?: boolean }>(
+    `${BASE}/${encodeURIComponent(chatId)}`,
+    { method: "PATCH", body: { pinned: Boolean(pinned) } },
+  );
+}
+
 export async function deleteChat(chatId: string): Promise<void> {
   await requestJson<{ success?: boolean }>(
     `${BASE}/${encodeURIComponent(chatId)}`,
