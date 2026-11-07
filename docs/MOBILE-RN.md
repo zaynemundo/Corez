@@ -22,7 +22,7 @@ the Capacitor shell in `android/` (see [MOBILE.md](./MOBILE.md)) is legacy.
 | Image viewer: tap an inline image for fullscreen, native share/save, copy link | Done |
 | Canvas preview: complete HTML artifacts open in a WebView; copy HTML and native share/save from chat | Done |
 | Publishing: publish from the canvas with a public link; Sites screen lists, opens, shares, copies and unpublishes pages | Done |
-| Sites analytics: 7/30/90-day traffic report per published page — totals, daily bars, top pages, source/country/device breakdowns | Done (JS-verified; not in the installed APK yet) |
+| Sites analytics: 7/30/90-day traffic report per published page — totals, daily bars, top pages, source/country/device breakdowns | Done |
 | Deep links: `corez://` scheme plus Android App Links for `/chat`, `/sites` and `/share/chat`; `/.well-known/assetlinks.json` served by the Worker from `ANDROID_APP_SHA256` | Code + unit tests done; device verification pending |
 | Shared logic extracted to `packages/corez-shared` (intent, skills, i18n, PDF/ZIP byte builders) | Done, web + mobile import the same modules |
 | Mobile sends the same client-side intent classification as the web | Done |
@@ -153,10 +153,11 @@ The debug APK was built in this workspace on 2026-11-07 with:
   Android debug certificate** because no release keystore is configured yet.
   It is installable for verification; a distributable release needs the
   keystore below, which flips the signing identity.
-- The refreshed release build (2026-11-07 21:30) embeds the canvas preview,
-  publishing/Sites screen and App Links configuration; the embedded
-  `assets/index.android.bundle` was checked for those features before the APK
-  was published to `mobile/build-artifacts/`.
+- The refreshed release build (2026-11-07 22:28, 98.2 MB) also embeds the
+  Sites analytics screen. Its `assets/index.android.bundle` was checked for the
+  analytics strings, the APK was re-installed and launched on the Android 16
+  emulator (`MainActivity` resumed, no fatal logcat entries), and it is the
+  file at `mobile/build-artifacts/app-release.apk`.
 
 Install on a USB-connected device with `adb install -r` once `adb devices`
 lists the phone.
