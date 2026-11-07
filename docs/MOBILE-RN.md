@@ -160,6 +160,14 @@ The debug APK was built in this workspace on 2026-11-07 with:
   Android debug certificate** because no release keystore is configured yet.
   It is installable for verification; a distributable release needs the
   keystore below, which flips the signing identity.
+- Reproducibility: [`build-apk-windows.ps1`](scripts/mobile/build-apk-windows.ps1)
+  was validated end to end from a **clean directory** (`-Destination C:\czbuild-fresh
+  -Variant release`): it provisioned the toolchain checks, copied the sources,
+  ran `npm ci`, `expo prebuild` (including the NDK libc++ config plugin), built
+  with 641/641 tasks and copied the APK back — `BUILD SUCCESSFUL in 12m58s`, no
+  manual steps. The resulting `app-release.apk` (98.18 MB, SHA-256
+  `5C267FAE…D8E97C`) contains the expected feature strings and keeps the V2
+  debug signature.
 - The latest release build (2026-11-08 00:05, 98.2 MB) embeds the canvas
   preview, publishing/Sites screen, Sites analytics, native artifact downloads,
   shared-conversation viewer and the image studio. Its
