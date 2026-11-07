@@ -159,12 +159,12 @@ The debug APK was built in this workspace on 2026-11-07 with:
   Android debug certificate** because no release keystore is configured yet.
   It is installable for verification; a distributable release needs the
   keystore below, which flips the signing identity.
-- The latest release build (2026-11-07 22:52, 98.2 MB) embeds the canvas
-  preview, publishing/Sites screen, Sites analytics and native artifact
-  downloads (PDF/ZIP/office links). Its `assets/index.android.bundle` was
+- The latest release build (2026-11-07 23:41, 98.2 MB) embeds the canvas
+  preview, publishing/Sites screen, Sites analytics, native artifact downloads
+  and the shared-conversation viewer. Its `assets/index.android.bundle` was
   checked for those feature strings, the APK was re-installed and launched on
-  the Android 16 emulator (`MainActivity` resumed, no fatal logcat entries),
-  and it is the file at `mobile/build-artifacts/app-release.apk`.
+  the Android 16 emulator, and it is the file at
+  `mobile/build-artifacts/app-release.apk`.
 
 Install on a USB-connected device with `adb install -r` once `adb devices`
 lists the phone.
@@ -247,6 +247,12 @@ The standalone release APK was installed on a freshly created Android 16 (API
    emulator's unconfigured Chrome disabled (it was intercepting as a generic
    browser), `am start -a android.intent.action.VIEW -d
    "https://corez.pro/chat/applink-test"` resumed `pro.corez.app/.MainActivity`.
+6. Shared conversations: `corez://share/chat/definitely-not-a-real-token`
+   opened the public viewer with no session; it showed the API's
+   `Shared chat not found.` message and the Open CoreZ button
+   ([screenshot](mobile/screenshots/shared-chat-unavailable.png)). The same
+   route is reachable from the `https://corez.pro/share/chat/<token>` App Link
+   (the intent filter for that path already existed; it now has a screen).
 
 The signed-in stream/stop/relaunch/sign-out steps still need the user's
 account credentials and a device (or the emulator) to sign in.
