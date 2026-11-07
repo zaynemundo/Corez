@@ -135,8 +135,9 @@ adb install -r mobile\build-artifacts\app-debug.apk
   permissions (camera, microphone, media) and config plugins. The launcher
   icon, adaptive icon foreground/monochrome and splash image now use the
   CoreZ brand mark (white `&`-style logo on `#0a0a0a`, generated from
-  `public/corez-white.png`); the old placeholder assets were replaced.
-  ([icon preview](mobile/screenshots/app-icon.png))
+  `public/corez-white.png`); the mark occupies 52% of the launcher icon canvas
+  (50% adaptive foreground, 36% splash) so it has generous breathing room
+  ([icon preview](mobile/screenshots/app-icon.png)).
 - Firebase / `google-services.json` is only needed for push notifications
   (Phase 3) and is gitignored.
 - Android App Links: `wrangler.jsonc` sets `ANDROID_APP_SHA256` to the SHA-256
