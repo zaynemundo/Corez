@@ -21,6 +21,7 @@ import {
 import { useTheme } from "@/state/theme";
 import { useI18n } from "@/i18n";
 import type { Attachment, AttachmentSource } from "@/lib/attachments";
+import type { DictationStatus } from "@/hooks/useDictation";
 
 interface ComposerProps {
   value: string;
@@ -36,6 +37,9 @@ interface ComposerProps {
   attachmentError?: string | null;
   onPickAttachment?: (source: AttachmentSource) => void;
   onRemoveAttachment?: (id: string) => void;
+  dictationStatus?: DictationStatus;
+  dictationError?: string | null;
+  onToggleDictation?: () => void;
 }
 
 export const Composer = forwardRef<TextInputInstance, ComposerProps>(
@@ -54,6 +58,9 @@ export const Composer = forwardRef<TextInputInstance, ComposerProps>(
       attachmentError,
       onPickAttachment,
       onRemoveAttachment,
+      dictationStatus = "idle",
+      dictationError,
+      onToggleDictation,
     },
     ref,
   ) {
@@ -119,12 +126,12 @@ export const Composer = forwardRef<TextInputInstance, ComposerProps>(
             </ScrollView>
           ) : null}
 
-          {attachmentError ? (
+          {attachmentError || dictationError ? (
             <Text
               accessibilityRole="alert"
               style={[styles.error, { color: colors.negative }]}
             >
-              {attachmentError}
+              {attachmentError || dictationError}
             </Text>
           ) : null}
 
@@ -153,6 +160,44 @@ export const Composer = forwardRef<TextInputInstance, ComposerProps>(
                 ) : (
                   <Text style={[styles.attachGlyph, { color: colors.textSecondary }]}>
                     +
+                  </Text>
+                )}
+              </Pressable>
+            ) : null}
+            {onToggleDictation ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={
+                  dictationStatus === "recording"
+                    ? t("chat.dictation.stop")
+                    : t("chat.dictation.start")
+                }
+                accessibilityState={{
+                  disabled: dictationStatus === "transcribing",
+                  busy: dictationStatus === "transcribing",
+                }}
+                onPress={onToggleDictation}
+                disabled={dictationStatus === "transcribing"}
+                style={({ pressed }) => [
+                  styles.attachButton,
+                  { opacity: pressed ? 0.6 : 1 },
+                ]}
+              >
+                {dictationStatus === "transcribing" ? (
+                  <ActivityIndicator size="small" color={colors.textSecondary} />
+                ) : (
+                  <Text
+                    style={[
+                      styles.micGlyph,
+                      {
+                        color:
+                          dictationStatus === "recording"
+                            ? colors.negative
+                            : colors.textSecondary,
+                      },
+                    ]}
+                  >
+                    {dictationStatus === "recording" ? "■" : "🎙"}
                   </Text>
                 )}
               </Pressable>
@@ -302,6 +347,7 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   attachGlyph: { fontSize: 24, lineHeight: 26, fontWeight: "400" },
+  micGlyph: { fontSize: 19, lineHeight: 22 },
   input: {
     flex: 1,
     fontSize: 15,

@@ -46,6 +46,7 @@ import {
 import { useAuth } from "@/state/auth";
 import { useTheme } from "@/state/theme";
 import { useI18n } from "@/i18n";
+import { useDictation } from "@/hooks/useDictation";
 import { friendlyError } from "@/lib/errors";
 
 const THINKING_TOKEN_RATIO = 4;
@@ -57,7 +58,7 @@ interface ChatViewProps {
 export function ChatView({ initialChatId }: ChatViewProps) {
   const { user } = useAuth();
   const { theme } = useTheme();
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const insets = useSafeAreaInsets();
   const colors = theme.colors;
 
@@ -214,6 +215,15 @@ export function ChatView({ initialChatId }: ChatViewProps) {
   const removeAttachment = useCallback((id: string) => {
     setAttachments((prev) => prev.filter((item) => item.id !== id));
   }, []);
+
+  const dictation = useDictation({
+    language,
+    onTranscript: (text) => {
+      setInput((prev) =>
+        `${prev ? `${prev} ` : ""}${text}`.slice(0, 20_000),
+      );
+    },
+  });
 
   const send = useCallback(
     async (override?: string) => {
@@ -593,6 +603,9 @@ export function ChatView({ initialChatId }: ChatViewProps) {
           attachmentError={attachmentError}
           onPickAttachment={(source) => void addAttachment(source)}
           onRemoveAttachment={removeAttachment}
+          dictationStatus={dictation.status}
+          dictationError={dictation.error}
+          onToggleDictation={dictation.toggle}
         />
       </View>
 
