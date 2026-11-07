@@ -24,7 +24,7 @@ the Capacitor shell in `android/` (see [MOBILE.md](./MOBILE.md)) is legacy.
 | Publishing: publish from the canvas with a public link; Sites screen lists, opens, shares, copies and unpublishes pages | Done |
 | Sites analytics: 7/30/90-day traffic report per published page — totals, daily bars, top pages, source/country/device breakdowns | Done |
 | Downloads: generated PDF/ZIP/office links in answers download to the device and open the native share sheet | Done |
-| Deep links: `corez://` scheme plus Android App Links for `/chat`, `/sites` and `/share/chat`; `/.well-known/assetlinks.json` served by the Worker from `ANDROID_APP_SHA256` | Code + unit tests done; device verification pending |
+| Deep links: `corez://` scheme plus Android App Links for `/chat`, `/sites` and `/share/chat`; `/.well-known/assetlinks.json` served by the Worker from `ANDROID_APP_SHA256` | Done — link verification confirmed on the Android 16 emulator |
 | Shared logic extracted to `packages/corez-shared` (intent, skills, i18n, PDF/ZIP byte builders) | Done, web + mobile import the same modules |
 | Mobile sends the same client-side intent classification as the web | Done |
 | Android bundle (`expo export --platform android`) | Passes |
@@ -133,11 +133,15 @@ adb install -r mobile\build-artifacts\app-debug.apk
   permissions (camera, microphone, media) and config plugins.
 - Firebase / `google-services.json` is only needed for push notifications
   (Phase 3) and is gitignored.
-- Android App Links verification: set `ANDROID_APP_SHA256` on the Worker (the
-  signing certificate SHA-256, comma-separated for multiple certificates) and
-  optionally `ANDROID_APP_PACKAGE` (default `pro.corez.app`). Without it the
-  `/.well-known/assetlinks.json` document is an empty list, so `corez://` links
-  still work but `https://corez.pro/...` links open the browser.
+- Android App Links: `wrangler.jsonc` sets `ANDROID_APP_SHA256` to the SHA-256
+  of the certificate that signs the current internal test APK (the Android
+  debug certificate, `FA:C6:17:…:3B:9C`), so
+  `https://corez.pro/.well-known/assetlinks.json` now returns the
+  `delegate_permission/common.handle_all_urls` relation for `pro.corez.app`.
+  Replace the value with the release keystore's fingerprint (comma-separated
+  for several certificates) when a production signing key exists; an empty
+  value is valid and disables https App Links. `ANDROID_APP_PACKAGE` is
+  optional (default `pro.corez.app`).
 
 ## Build evidence
 
@@ -234,10 +238,17 @@ The standalone release APK was installed on a freshly created Android 16 (API
 4. `adb shell am start -a android.intent.action.VIEW -d "corez://chat/verification-test" pro.corez.app`
    reopened `MainActivity` with no crash (the unauthenticated route falls back
    to the login screen through `SessionGate`).
+5. Android App Links: `pm get-app-links pro.corez.app` reports
+   `corez.pro: 1024` (STATE_VERIFIED) after `pm verify-app-links --re-verify`,
+   i.e. Android fetched the live assetlinks document and accepted the
+   fingerprint. `cmd package query-activities` lists
+   `pro.corez.app/.MainActivity` for `https://corez.pro/chat/...`; with the
+   emulator's unconfigured Chrome disabled (it was intercepting as a generic
+   browser), `am start -a android.intent.action.VIEW -d
+   "https://corez.pro/chat/applink-test"` resumed `pro.corez.app/.MainActivity`.
 
-The signed-in stream/stop/relaunch/sign-out steps and the App Links
-verification still need either the user's account credentials or a physical
-device with a verified certificate fingerprint.
+The signed-in stream/stop/relaunch/sign-out steps still need the user's
+account credentials and a device (or the emulator) to sign in.
 
 ## Known limitations at this stage
 
