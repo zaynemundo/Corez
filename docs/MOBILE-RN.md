@@ -222,6 +222,31 @@ always reproduces the fix. Reference:
 5. Kill and relaunch — the session survives (token restored) — **pending sign-in**.
 6. Sign out — token cleared, login screen returns — **pending sign-in**.
 
+## On-device spike helper
+
+[`scripts/mobile/verify-device-spike.ps1`](scripts/mobile/verify-device-spike.ps1)
+automates every part of the Phase 0 spike that does not need your password,
+and prints exactly what it observed instead of assuming success. Signing in
+stays manual on the phone, so the stages are explicit:
+
+```powershell
+# install the current release APK, launch it, confirm the login UI
+powershell -ExecutionPolicy Bypass -File scripts/mobile/verify-device-spike.ps1 -Stage install
+# after signing in on the phone: send "hello", capture streaming, press Stop
+powershell -ExecutionPolicy Bypass -File scripts/mobile/verify-device-spike.ps1 -Stage chat
+# kill + relaunch and check the session survived
+powershell -ExecutionPolicy Bypass -File scripts/mobile/verify-device-spike.ps1 -Stage relaunch
+# open Settings, sign out, confirm the login screen returns
+powershell -ExecutionPolicy Bypass -File scripts/mobile/verify-device-spike.ps1 -Stage signout
+```
+
+Without a connected device it prints the USB-debugging steps and exits 2.
+Screenshots and UI dumps for each stage land in `.tools/spike/` (gitignored).
+The `install` stage was exercised against the Android 16 emulator: signature
+verified, install `Success`, `MainActivity` focused, and the login labels
+(`COREZ`, `Sign in to your account`, Email, Password, Login, Sign up) were
+detected from the live UI dump.
+
 ## Emulator verification (2026-11-07)
 
 The standalone release APK was installed on a freshly created Android 16 (API
