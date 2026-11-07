@@ -573,6 +573,32 @@ const HASHED_BUILD_ASSET_PATTERN =
   /^\/assets\/.+-[A-Za-z0-9_-]{8,}\.[A-Za-z0-9]+$/;
 const HASHED_ASSET_CACHE_CONTROL = "public, max-age=31536000, immutable";
 
+/**
+ * Android App Links verification document.
+ *
+ * The Play/sideload install is only trustworthy for `https://corez.pro/...`
+ * links when the domain serves the signing certificate fingerprint here. The
+ * fingerprint list comes from the deployment environment because a debug
+ * certificate and the eventual release certificate are different.
+ */
+export function buildAndroidAssetLinks(env = {}) {
+  const fingerprints = String(env.ANDROID_APP_SHA256 || "")
+    .split(",")
+    .map((value) => value.trim().toUpperCase())
+    .filter(Boolean);
+  if (fingerprints.length === 0) return [];
+  return [
+    {
+      relation: ["delegate_permission/common.handle_all_urls"],
+      target: {
+        namespace: "android_app",
+        package_name: String(env.ANDROID_APP_PACKAGE || "pro.corez.app"),
+        sha256_cert_fingerprints: fingerprints,
+      },
+    },
+  ];
+}
+
 // Serve a static asset from the assets binding, attaching the application
 // CSP to HTML documents. Non-HTML responses pass through untouched except for
 // hashed build artifacts, which get immutable browser caching.
@@ -618,6 +644,15 @@ export default {
     }
 
     const pathname = new URL(request.url).pathname;
+    if (pathname === "/.well-known/assetlinks.json" && request.method === "GET") {
+      return new Response(JSON.stringify(buildAndroidAssetLinks(env)), {
+        status: 200,
+        headers: {
+          "Content-Type": "application/json",
+          "Cache-Control": "public, max-age=300",
+        },
+      });
+    }
     if (pathname === "/api/ai") {
       return handleAi(request, env);
     }

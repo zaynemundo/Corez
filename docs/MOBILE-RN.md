@@ -22,6 +22,7 @@ the Capacitor shell in `android/` (see [MOBILE.md](./MOBILE.md)) is legacy.
 | Image viewer: tap an inline image for fullscreen, native share/save, copy link | Done |
 | Canvas preview: complete HTML artifacts open in a WebView; copy HTML and native share/save from chat | Done |
 | Publishing: publish from the canvas with a public link; Sites screen lists, opens, shares, copies and unpublishes pages | Done |
+| Deep links: `corez://` scheme plus Android App Links for `/chat`, `/sites` and `/share/chat`; `/.well-known/assetlinks.json` served by the Worker from `ANDROID_APP_SHA256` | Code + unit tests done; device verification pending |
 | Shared logic extracted to `packages/corez-shared` (intent, skills, i18n, PDF/ZIP byte builders) | Done, web + mobile import the same modules |
 | Mobile sends the same client-side intent classification as the web | Done |
 | Android bundle (`expo export --platform android`) | Passes |
@@ -130,6 +131,11 @@ adb install -r mobile\build-artifacts\app-debug.apk
   permissions (camera, microphone, media) and config plugins.
 - Firebase / `google-services.json` is only needed for push notifications
   (Phase 3) and is gitignored.
+- Android App Links verification: set `ANDROID_APP_SHA256` on the Worker (the
+  signing certificate SHA-256, comma-separated for multiple certificates) and
+  optionally `ANDROID_APP_PACKAGE` (default `pro.corez.app`). Without it the
+  `/.well-known/assetlinks.json` document is an empty list, so `corez://` links
+  still work but `https://corez.pro/...` links open the browser.
 
 ## Build evidence
 
@@ -201,8 +207,7 @@ always reproduces the fix. Reference:
 
 ## Known limitations at this stage
 
-- Deep links, push notifications and the dedicated image-generation UI are
-  still to come.
+- Push notifications and the dedicated image-generation UI are still to come.
 - The canvas renders complete HTML documents and canvas games. The web's
   multi-page document splitting and React/JSX compilation pipeline are not
   ported yet, so those artifacts preview as their raw first document.
