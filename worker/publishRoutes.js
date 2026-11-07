@@ -43,6 +43,7 @@ import {
   dropUnreferencedAssetMarkers,
   scanPublishRecords,
   listUserPublishRecords,
+  findLatestPublishBySession,
   publishRecordSummary,
 } from "./publishStore.js";
 
@@ -422,6 +423,16 @@ export async function handlePublish(request, env, ctx = null, serveAssets = null
       }
     }
 
+    // Which chat this page came from. Resolved BEFORE the slug so a revision
+    // that arrives with no slug (published from another device, or after the
+    // browser's 50-entry local lineage was evicted) can republish to the URL
+    // this session already owns instead of inventing a new one.
+    const publishSessionId =
+      typeof body?.sessionId === "string" &&
+      SAFE_STORAGE_SEGMENT.test(body.sessionId.trim())
+        ? body.sessionId.trim().slice(0, 160)
+        : null;
+
     const rawRequestedSlug =
       typeof body?.slug === "string" ? body.slug.trim().toLowerCase() : null;
     let slug = null;
@@ -495,15 +506,31 @@ export async function handlePublish(request, env, ctx = null, serveAssets = null
           Boolean(body?.previousSlug && body.previousSlug !== rawRequestedSlug);
       }
     } else {
-      for (let attempt = 0; attempt < 5; attempt++) {
-        const candidate = generatePublishSlug();
-        const existing = await resolvePublishRecord(env, candidate);
-        if (!existing) {
-          slug = candidate;
-          break;
+      // A revision of a creation that is already published must keep its
+      // public URL. The record stores the originating session id, so this
+      // works even when the client no longer remembers the slug.
+      if (publishSessionId) {
+        const alreadyPublished = await findLatestPublishBySession(
+          env,
+          uid,
+          publishSessionId,
+        ).catch(() => null);
+        if (alreadyPublished?.record?.slug) {
+          slug = alreadyPublished.record.slug;
+          isCustomized = Boolean(alreadyPublished.record.customized);
         }
       }
-      isCustomized = false;
+      if (!slug) {
+        for (let attempt = 0; attempt < 5; attempt++) {
+          const candidate = generatePublishSlug();
+          const existing = await resolvePublishRecord(env, candidate);
+          if (!existing) {
+            slug = candidate;
+            break;
+          }
+        }
+        isCustomized = false;
+      }
     }
     if (!slug) {
       return jsonResponse(503, {
@@ -523,17 +550,14 @@ export async function handlePublish(request, env, ctx = null, serveAssets = null
 
     // Which chat this page came from. Deleting that chat unpublishes the page
     // (see cleanupChatStorage), so the lineage is stored with the record rather
-    // than only in the browser that published it.
-    let publishSessionId =
-      typeof body?.sessionId === "string" &&
-      SAFE_STORAGE_SEGMENT.test(body.sessionId.trim())
-        ? body.sessionId.trim().slice(0, 160)
-        : null;
-    if (!publishSessionId) {
+    // than only in the browser that published it. A client that omits
+    // sessionId (older builds) inherits it from the record being republished.
+    let effectiveSessionId = publishSessionId;
+    if (!effectiveSessionId) {
       const previous = await resolvePublishRecord(env, slug).catch(() => null);
       const previousSessionId = previous?.record?.sessionId;
       if (typeof previousSessionId === "string" && previousSessionId) {
-        publishSessionId = previousSessionId;
+        effectiveSessionId = previousSessionId;
       }
     }
 
@@ -546,8 +570,8 @@ export async function handlePublish(request, env, ctx = null, serveAssets = null
       ownerUserId: uid,
       createdAt: new Date().toISOString(),
     };
-    if (publishSessionId) {
-      record.sessionId = publishSessionId;
+    if (effectiveSessionId) {
+      record.sessionId = effectiveSessionId;
     }
     if (Object.keys(pages).length > 0) {
       record.pages = pages;

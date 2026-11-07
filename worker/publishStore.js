@@ -515,6 +515,47 @@ export async function listUserPublishRecords(env, uid, { limit = MAX_OWNED_PUBLI
 }
 
 /**
+ * Find the page a chat session already published, so a revision republishes to
+ * the SAME public URL.
+ *
+ * The browser remembers the slug locally (`corez_publish_lineage`), but that
+ * memory is per device and bounded to 50 sessions — after a reload on a second
+ * device, or once the entry is evicted, the client sends no slug and the
+ * server used to invent a brand-new one. A returning user then found their
+ * link had changed and their alert/QR/printed URL dead. The record itself
+ * carries `sessionId`, so the server can resolve the existing link without the
+ * client remembering anything.
+ *
+ * Returns the newest matching record owned by `uid`, or null.
+ */
+export async function findLatestPublishBySession(env, uid, sessionId) {
+  if (!uid || typeof sessionId !== "string" || !sessionId) return null;
+  if (!env?.ASSET_BUCKET || typeof env.ASSET_BUCKET.list !== "function") return null;
+  let records;
+  try {
+    ({ records } = await listUserPublishRecords(env, uid));
+  } catch {
+    return null;
+  }
+  let best = null;
+  for (const entry of records || []) {
+    const record = entry?.record;
+    if (!record || record.sessionId !== sessionId) continue;
+    if (typeof record.slug !== "string" || !PUBLISH_SLUG_PATTERN.test(record.slug)) continue;
+    // listUserPublishRecords already scopes by folder; this is the same
+    // ownership guard the publish route applies everywhere else.
+    if (record.ownerUserId && record.ownerUserId !== uid) continue;
+    if (
+      !best ||
+      String(record.createdAt || "") > String(best.record?.createdAt || "")
+    ) {
+      best = entry;
+    }
+  }
+  return best;
+}
+
+/**
  * The owner-facing shape of a publish record: everything needed to recognise
  * and manage a link, never the document bodies (each can be megabytes).
  */
