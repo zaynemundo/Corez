@@ -100,4 +100,19 @@ describe("MarkdownView rendering", () => {
     expect(screen.getByText("Share")).toBeTruthy();
     expect(screen.getByText("Copy link")).toBeTruthy();
   });
+
+  it("offers a canvas preview for a complete HTML artifact", async () => {
+    await renderMarkdown(
+      "```html\n<!doctype html><html><body><h1>Hello canvas</h1></body></html>\n```",
+    );
+    expect(screen.queryByText("Preview")).toBeTruthy();
+    await fireEvent.press(screen.getByText("Preview"));
+    expect(screen.getByText("Preview canvas")).toBeTruthy();
+    expect(screen.getByTestId("corez-webview")).toBeTruthy();
+  });
+
+  it("does not offer a canvas preview for a non-HTML snippet", async () => {
+    await renderMarkdown("```js\nconst x = 1;\n```");
+    expect(screen.queryByText("Preview")).toBeNull();
+  });
 });

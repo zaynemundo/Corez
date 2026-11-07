@@ -18,3 +18,14 @@ jest.mock("expo-secure-store", () => {
     }),
   };
 });
+
+// react-native-webview is a native component; tests only need a View stub so
+// markdown previews can render without a device.
+jest.mock("react-native-webview", () => {
+  const React = require("react");
+  const { View } = require("react-native");
+  return {
+    WebView: (props) =>
+      React.createElement(View, { testID: "corez-webview", ...props }),
+  };
+});

@@ -24,7 +24,14 @@ import { marked, type Token } from "marked";
 import { useTheme } from "@/state/theme";
 import { useI18n } from "@/i18n";
 import { resolveAssetUrl } from "@/lib/urls";
+import {
+  artifactFileName,
+  isHtmlLanguage,
+  isRenderableHtml,
+} from "@/lib/artifacts";
+import { shareTextFile } from "@/lib/downloads";
 import { ImageFullscreenModal } from "./ImageFullscreenModal";
+import { CanvasView } from "./CanvasView";
 
 const MAX_CACHE_ENTRIES = 60;
 const parseCache = new Map<string, Token[]>();
@@ -43,6 +50,7 @@ export function parseMarkdown(content: string): Token[] {
 export const resolveMarkdownUrl = resolveAssetUrl;
 
 const ImagePressContext = createContext<((uri: string) => void) | null>(null);
+const CanvasOpenContext = createContext<((html: string) => void) | null>(null);
 
 function stripHtml(value: string): string {
   return String(value || "").replace(/<[^>]+>/g, "");
@@ -51,19 +59,25 @@ function stripHtml(value: string): string {
 export function MarkdownView({ content }: { content: string }) {
   const tokens = useMemo(() => parseMarkdown(content), [content]);
   const [fullscreenUri, setFullscreenUri] = useState<string | null>(null);
+  const [canvasHtml, setCanvasHtml] = useState<string | null>(null);
   return (
     <ImagePressContext.Provider value={setFullscreenUri}>
-      <View style={styles.container}>
-        {tokens.map((token, index) => (
-          <Block key={`${token.type}-${index}`} token={token} />
-        ))}
-      </View>
-      {fullscreenUri ? (
-        <ImageFullscreenModal
-          uri={fullscreenUri}
-          onClose={() => setFullscreenUri(null)}
-        />
-      ) : null}
+      <CanvasOpenContext.Provider value={setCanvasHtml}>
+        <View style={styles.container}>
+          {tokens.map((token, index) => (
+            <Block key={`${token.type}-${index}`} token={token} />
+          ))}
+        </View>
+        {fullscreenUri ? (
+          <ImageFullscreenModal
+            uri={fullscreenUri}
+            onClose={() => setFullscreenUri(null)}
+          />
+        ) : null}
+        {canvasHtml ? (
+          <CanvasView html={canvasHtml} onClose={() => setCanvasHtml(null)} />
+        ) : null}
+      </CanvasOpenContext.Provider>
     </ImagePressContext.Provider>
   );
 }
@@ -329,8 +343,11 @@ function CodeBlock({ code, language }: { code: string; language: string }) {
   const { theme } = useTheme();
   const { t } = useI18n();
   const colors = theme.colors;
+  const openCanvas = useContext(CanvasOpenContext);
   const [copied, setCopied] = useState(false);
+  const [shared, setShared] = useState(false);
   const resetTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const canPreview = isHtmlLanguage(language) || isRenderableHtml(code);
 
   useEffect(
     () => () => {
@@ -350,6 +367,20 @@ function CodeBlock({ code, language }: { code: string; language: string }) {
     }
   };
 
+  const share = async () => {
+    const ok = await shareTextFile({
+      content: code,
+      fileName: artifactFileName(code),
+      mimeType: "text/html",
+      dialogTitle: t("canvas.shareFile"),
+    });
+    if (ok) {
+      setShared(true);
+      if (resetTimer.current) clearTimeout(resetTimer.current);
+      resetTimer.current = setTimeout(() => setShared(false), 1600);
+    }
+  };
+
   return (
     <View
       style={[
@@ -366,16 +397,42 @@ function CodeBlock({ code, language }: { code: string; language: string }) {
         <Text style={[styles.codeLang, { color: colors.textMuted }]}>
           {language || t("chat.code.plain")}
         </Text>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={t("chat.code.copy")}
-          onPress={() => void copy()}
-          hitSlop={8}
-        >
-          <Text style={[styles.codeAction, { color: colors.textSecondary }]}>
-            {copied ? t("chat.code.copied") : t("chat.code.copy")}
-          </Text>
-        </Pressable>
+        <View style={styles.codeActions}>
+          {canPreview && openCanvas ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t("canvas.preview")}
+              onPress={() => openCanvas(code)}
+              hitSlop={8}
+            >
+              <Text style={[styles.codeAction, { color: colors.textPrimary }]}>
+                {t("canvas.preview")}
+              </Text>
+            </Pressable>
+          ) : null}
+          {canPreview ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t("canvas.shareFile")}
+              onPress={() => void share()}
+              hitSlop={8}
+            >
+              <Text style={[styles.codeAction, { color: colors.textSecondary }]}>
+                {shared ? t("canvas.shared") : t("canvas.shareFile")}
+              </Text>
+            </Pressable>
+          ) : null}
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t("chat.code.copy")}
+            onPress={() => void copy()}
+            hitSlop={8}
+          >
+            <Text style={[styles.codeAction, { color: colors.textSecondary }]}>
+              {copied ? t("chat.code.copied") : t("chat.code.copy")}
+            </Text>
+          </Pressable>
+        </View>
       </View>
       <ScrollView horizontal showsHorizontalScrollIndicator={false}>
         <Text
@@ -458,6 +515,11 @@ const styles = StyleSheet.create({
   codeLang: {
     fontFamily: "JetBrainsMono_400Regular",
     fontSize: 11,
+  },
+  codeActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
   },
   codeAction: { fontSize: 11.5, fontWeight: "600" },
   codeText: {

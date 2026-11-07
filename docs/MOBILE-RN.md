@@ -20,6 +20,7 @@ the Capacitor shell in `android/` (see [MOBILE.md](./MOBILE.md)) is legacy.
 | Chat management: rename, pin/unpin, delete, pinned/recent sections, title header | Done |
 | Offline read cache: SQLite snapshot of the chat list and open conversation, marked as an offline copy | Done |
 | Image viewer: tap an inline image for fullscreen, native share/save, copy link | Done |
+| Canvas preview: complete HTML artifacts open in a WebView; copy HTML and native share/save from chat | Done |
 | Shared logic extracted to `packages/corez-shared` (intent, skills, i18n, PDF/ZIP byte builders) | Done, web + mobile import the same modules |
 | Mobile sends the same client-side intent classification as the web | Done |
 | Android bundle (`expo export --platform android`) | Passes |
@@ -199,14 +200,17 @@ always reproduces the fix. Reference:
 
 ## Known limitations at this stage
 
-- Image-generation UI, canvas preview, publishing, downloads, deep links and
-  push are still to come.
+- Publishing/sites analytics, deep links, push and the dedicated image-generation
+  UI are still to come.
+- The canvas renders complete HTML documents and canvas games. The web's
+  multi-page document splitting and React/JSX compilation pipeline are not
+  ported yet, so those artifacts preview as their raw first document.
 - Voice dictation transcribes after the recording stops (Whisper); the web's
   live partial transcript is not implemented yet.
 - Attachments cover images (camera/gallery) and files (text content for small
   text-like documents, metadata for binaries); PDF text extraction is not
   ported yet.
-- Markdown rendering covers the answer format but not the web's one-click
-  code-file save/download actions.
+- Markdown rendering covers the answer format; code-file save actions exist for
+  HTML artifacts (share/save) but not for every code block.
 - The history sheet renames, pins and deletes conversations; project folders
   are the next persistence increment.
