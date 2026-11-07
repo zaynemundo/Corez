@@ -118,7 +118,9 @@ export default defineConfig(async () => {
     },
     test: {
       setupFiles: ['./tests/setup.js'],
-      exclude: ['**/node_modules/**', '**/dist/**', '**/deepseek-harness/**'],
+      // `mobile/` is a separate Expo project with its own Jest config; root
+      // Vitest must not collect its tests (they use Jest globals).
+      exclude: ['**/node_modules/**', '**/dist/**', '**/deepseek-harness/**', '**/mobile/**'],
     },
   }
 })

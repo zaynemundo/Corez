@@ -19,6 +19,10 @@ import {
   handleAuth,
   ensureTables,
   isProductionRequest,
+  getBearerToken,
+  getSessionToken,
+  isNativeClientRequest,
+  NATIVE_CLIENT_HEADER,
   SESSION_COOKIE
 } from '../worker/auth.js';
 import { createSqliteD1 } from './helpers/sqliteD1.js';
@@ -930,6 +934,213 @@ describe('Worker Auth Engine', () => {
         .bind('pr_race')
         .first();
       expect(Number(spent.used)).toBe(1);
+    });
+  });
+
+  // The native app has no cookie jar shared with corez.pro, so the same signed
+  // session JWT travels in `Authorization: Bearer`. These tests pin the two
+  // properties that make that safe: the verifier treats both transports
+  // identically (including password-change revocation), and a token is only
+  // ever written into a response for a request that declares itself native and
+  // comes from outside a browser.
+  describe('Native bearer sessions', () => {
+    const NATIVE_HEADERS = { [NATIVE_CLIENT_HEADER]: 'native' };
+    let mockEnv;
+    let ipCounter;
+
+    beforeEach(() => {
+      mockEnv = { DB: createMockD1(), AUTH_SECRET: TEST_SECRET };
+      ipCounter = 0;
+    });
+
+    const authRequest = (path, { headers = {}, body, method = 'POST' } = {}) =>
+      new Request(`https://corez.pro${path}`, {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+          'CF-Connecting-IP': `10.70.0.${++ipCounter}`,
+          ...headers,
+        },
+        ...(body ? { body: JSON.stringify(body) } : {}),
+      });
+
+    const signup = (email, headers) =>
+      handleAuth(
+        authRequest('/api/auth/signup', {
+          headers,
+          body: { email, password: 'Password123!' },
+        }),
+        mockEnv,
+      );
+
+    it('extracts bearer tokens and prefers them over a cookie', () => {
+      const req = new Request('https://corez.pro/api/ai', {
+        headers: {
+          Authorization: 'Bearer abc.def.ghi',
+          Cookie: `${SESSION_COOKIE}=cookie_token`,
+        },
+      });
+      expect(getBearerToken(req)).toBe('abc.def.ghi');
+      expect(getSessionToken(req)).toBe('abc.def.ghi');
+      expect(
+        getSessionToken(
+          new Request('https://corez.pro/api/ai', {
+            headers: { Cookie: `${SESSION_COOKIE}=cookie_token` },
+          }),
+        ),
+      ).toBe('cookie_token');
+      expect(getBearerToken(new Request('https://corez.pro/api/ai'))).toBeNull();
+    });
+
+    it('only treats header-marked, origin-less requests as native', () => {
+      expect(
+        isNativeClientRequest(
+          new Request('https://corez.pro/api/auth/login', {
+            method: 'POST',
+            headers: { [NATIVE_CLIENT_HEADER]: 'native' },
+          }),
+        ),
+      ).toBe(true);
+      // A browser request carries an Origin, so it never receives a token.
+      expect(
+        isNativeClientRequest(
+          new Request('https://corez.pro/api/auth/login', {
+            method: 'POST',
+            headers: {
+              [NATIVE_CLIENT_HEADER]: 'native',
+              Origin: 'https://corez.pro',
+            },
+          }),
+        ),
+      ).toBe(false);
+      expect(
+        isNativeClientRequest(
+          new Request('https://corez.pro/api/auth/login', { method: 'POST' }),
+        ),
+      ).toBe(false);
+    });
+
+    it('verifies a bearer token exactly like the session cookie', async () => {
+      const exp = Math.floor(Date.now() / 1000) + 3600;
+      const token = await createJWT(
+        { uid: 'u_bearer', email: 'bearer@corez.pro', exp },
+        TEST_SECRET,
+      );
+      mockEnv.DB.users.set('bearer@corez.pro', {
+        id: 'u_bearer',
+        email: 'bearer@corez.pro',
+        password_hash: 'hash',
+        provider: 'local',
+        created_at: Date.now(),
+        plan: 'free',
+      });
+
+      const req = new Request('https://corez.pro/api/auth/me', {
+        method: 'GET',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      expect((await verifySession(req, mockEnv))?.uid).toBe('u_bearer');
+      const res = await handleAuth(req, mockEnv);
+      expect(res.status).toBe(200);
+      expect((await res.json()).user.email).toBe('bearer@corez.pro');
+    });
+
+    it('returns a token to native requests and withholds it from browsers', async () => {
+      const nativeRes = await signup('native@corez.pro', NATIVE_HEADERS);
+      expect(nativeRes.status).toBe(200);
+      const nativeBody = await nativeRes.json();
+      expect(typeof nativeBody.token).toBe('string');
+      const payload = await verifyJWT(nativeBody.token, TEST_SECRET);
+      expect(payload.email).toBe('native@corez.pro');
+
+      // The browser path keeps its HttpOnly cookie and never sees a token.
+      const browserRes = await signup('browser@corez.pro', {
+        Origin: 'https://corez.pro',
+      });
+      expect(browserRes.status).toBe(200);
+      const browserBody = await browserRes.json();
+      expect(browserBody.token).toBeUndefined();
+      expect(browserRes.headers.get('Set-Cookie')).toContain(SESSION_COOKIE);
+    });
+
+    it('re-mints a valid bearer token on POST /api/auth/refresh', async () => {
+      const res = await signup('refresh@corez.pro', NATIVE_HEADERS);
+      const { token } = await res.json();
+
+      const refreshRes = await handleAuth(
+        new Request('https://corez.pro/api/auth/refresh', {
+          method: 'POST',
+          headers: {
+            [NATIVE_CLIENT_HEADER]: 'native',
+            Authorization: `Bearer ${token}`,
+          },
+        }),
+        mockEnv,
+      );
+      expect(refreshRes.status).toBe(200);
+      const refreshed = await refreshRes.json();
+      expect(typeof refreshed.token).toBe('string');
+      expect(refreshed.user.email).toBe('refresh@corez.pro');
+      const payload = await verifyJWT(refreshed.token, TEST_SECRET);
+      expect(payload.uid).toBe((await verifyJWT(token, TEST_SECRET)).uid);
+    });
+
+    it('refuses refresh for browser requests and expired/revoked tokens', async () => {
+      const signedIn = await signup('revoked@corez.pro', NATIVE_HEADERS);
+      const { token } = await signedIn.json();
+
+      const browserRefresh = await handleAuth(
+        new Request('https://corez.pro/api/auth/refresh', {
+          method: 'POST',
+          headers: {
+            [NATIVE_CLIENT_HEADER]: 'native',
+            Origin: 'https://corez.pro',
+            Authorization: `Bearer ${token}`,
+          },
+        }),
+        mockEnv,
+      );
+      expect(browserRefresh.status).toBe(403);
+      expect((await browserRefresh.json()).code).toBe('native_only');
+
+      const expired = await createJWT(
+        {
+          uid: 'u_revoked',
+          email: 'revoked@corez.pro',
+          exp: Math.floor(Date.now() / 1000) - 60,
+        },
+        TEST_SECRET,
+      );
+      const expiredRefresh = await handleAuth(
+        new Request('https://corez.pro/api/auth/refresh', {
+          method: 'POST',
+          headers: {
+            [NATIVE_CLIENT_HEADER]: 'native',
+            Authorization: `Bearer ${expired}`,
+          },
+        }),
+        mockEnv,
+      );
+      expect(expiredRefresh.status).toBe(401);
+      expect((await expiredRefresh.json()).code).toBe('session_expired');
+
+      // A password change after the token was minted revokes it: refresh must
+      // not resurrect the session the verifier already rejected.
+      const account = [...mockEnv.DB.users.values()].find(
+        (u) => u.email === 'revoked@corez.pro',
+      );
+      account.password_changed_at = Date.now();
+      const staleRefresh = await handleAuth(
+        new Request('https://corez.pro/api/auth/refresh', {
+          method: 'POST',
+          headers: {
+            [NATIVE_CLIENT_HEADER]: 'native',
+            Authorization: `Bearer ${token}`,
+          },
+        }),
+        mockEnv,
+      );
+      expect(staleRefresh.status).toBe(401);
     });
   });
 });

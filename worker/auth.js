@@ -111,6 +111,57 @@ export function clearCookieHeader() {
   );
 }
 
+// ---------- native (React Native) sessions ----------
+//
+// The web authenticates with the HttpOnly `corez_session` cookie. The native
+// app runs on `https://localhost` (or a bundler origin), which is cross-site to
+// corez.pro, so a SameSite=Lax cookie is not sent and the WebView's cookie jar
+// is not shared with React Native's fetch. The same signed JWT therefore
+// travels in `Authorization: Bearer` for native clients. Token issuance is
+// limited to requests that declare themselves native and carry no browser
+// Origin, so a browser fetch cannot read a token out of the JSON body.
+export const NATIVE_CLIENT_HEADER = "X-Corez-Client";
+
+export function getBearerToken(request) {
+  const header = request.headers.get("Authorization") || "";
+  const match = /^Bearer\s+(.+)$/i.exec(header.trim());
+  return match ? match[1].trim() : null;
+}
+
+/**
+ * The session token a request presents: bearer first (native), then cookie
+ * (web). Both carry the same claims and the same revocation rules.
+ */
+export function getSessionToken(request) {
+  return getBearerToken(request) || getCookie(request, SESSION_COOKIE);
+}
+
+/**
+ * True for a first-party native client: it opts in with the header and sends
+ * no browser Origin. A browser cannot set this combination without CORS
+ * preflight approval, and even a same-origin browser request only receives a
+ * token for the session it already holds.
+ */
+export function isNativeClientRequest(request) {
+  return (
+    request.headers.get(NATIVE_CLIENT_HEADER) === "native" &&
+    !request.headers.get("Origin")
+  );
+}
+
+function sessionResponse(request, payload, token) {
+  const body = isNativeClientRequest(request)
+    ? { ...payload, token }
+    : payload;
+  return new Response(JSON.stringify(body), {
+    status: 200,
+    headers: {
+      "Content-Type": "application/json",
+      "Set-Cookie": setCookieHeader(token),
+    },
+  });
+}
+
 export function randomId() {
   return crypto.randomUUID();
 }
@@ -259,7 +310,9 @@ export function isProductionRequest(request, env = {}) {
 export async function verifySession(request, env) {
   const secret = env?.AUTH_SECRET;
   if (!secret) return null; // no secret: nothing can be verified
-  const token = getCookie(request, SESSION_COOKIE);
+  // Bearer first: the native app has no cookie to send. The claims and the
+  // revocation checks below are identical for both transports.
+  const token = getSessionToken(request);
   if (!token) return null;
   const payload = await verifyJWT(token, secret);
   if (!payload || !payload.uid) return null;
@@ -402,6 +455,53 @@ export async function handleAuth(request, env) {
     });
   }
 
+  // POST /api/auth/refresh — native clients renew their bearer token before it
+  // expires. The presented token must still be valid, so a stolen or revoked
+  // session cannot extend itself; the password-changed revocation claim is
+  // enforced by verifySession exactly as for every other request.
+  if (path === "/api/auth/refresh" && request.method === "POST") {
+    if (!isNativeClientRequest(request)) {
+      return jsonResponse(403, {
+        error: "Token refresh is only available to the CoreZ mobile app.",
+        code: "native_only",
+      });
+    }
+    const sess = await verifySession(request, env);
+    if (!sess) {
+      return jsonResponse(401, {
+        error: "Session expired. Please sign in again.",
+        code: "session_expired",
+      });
+    }
+    const user = await findUserById(env, sess.uid);
+    // With D1 configured the account must still exist (a deleted account must
+    // not be able to refresh its way back in). Without D1 the verified JWT
+    // claims are all there is, and verifySession already accepted them.
+    if (env?.DB && !user) {
+      return jsonResponse(401, {
+        error: "Session expired. Please sign in again.",
+        code: "session_expired",
+      });
+    }
+    const account = user || {
+      id: sess.uid,
+      email: sess.email,
+      plan: sess.plan,
+    };
+    const plan =
+      (account.plan && String(account.plan).trim().toLowerCase()) || "free";
+    const token = await createSessionToken(env, {
+      id: account.id,
+      email: account.email,
+      plan,
+      password_changed_at: account.password_changed_at,
+    });
+    return jsonResponse(200, {
+      token,
+      user: { id: account.id, email: account.email, plan },
+    });
+  }
+
   // POST /api/auth/signup — invite code no longer required, 3 plans: free / standard / premium
   if (path === "/api/auth/signup" && request.method === "POST") {
     let body;
@@ -499,16 +599,7 @@ export async function handleAuth(request, env) {
     }
 
     const token = await createSessionToken(env, { id, email, plan });
-    return new Response(
-      JSON.stringify({ ok: true, user: { id, email, plan } }),
-      {
-        status: 200,
-        headers: {
-          "Content-Type": "application/json",
-          "Set-Cookie": setCookieHeader(token),
-        },
-      },
-    );
+    return sessionResponse(request, { ok: true, user: { id, email, plan } }, token);
   }
 
   // POST /api/auth/login
@@ -545,18 +636,10 @@ export async function handleAuth(request, env) {
       plan,
       password_changed_at: user.password_changed_at,
     });
-    return new Response(
-      JSON.stringify({
-        ok: true,
-        user: { id: user.id, email: user.email, plan },
-      }),
-      {
-        status: 200,
-        headers: {
-          "Content-Type": "application/json",
-          "Set-Cookie": setCookieHeader(token),
-        },
-      },
+    return sessionResponse(
+      request,
+      { ok: true, user: { id: user.id, email: user.email, plan } },
+      token,
     );
   }
 

@@ -1,3 +1,5 @@
+> **Legacy:** this Capacitor shell is frozen. The native React Native client in `mobile/` (see [MOBILE-RN.md](./MOBILE-RN.md)) is the app being built; this document stays for reference until the native client reaches parity.
+
 # Corez Mobile (Capacitor)
 
 The native shells live in `android/` (and `ios/` once generated on a Mac) and are
@@ -104,3 +106,4 @@ npm run mobile:assets && npm run mobile:sync
 `xcodebuild archive` require macOS with Xcode. The same `capacitor.config.json`
 applies; `ios.contentInset: "always"` is already set so the WebView respects the
 safe area.
+
