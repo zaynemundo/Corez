@@ -13,6 +13,7 @@ the Capacitor shell in `android/` (see [MOBILE.md](./MOBILE.md)) is legacy.
 | Bearer-token auth in `worker/auth.js` (login/signup/refresh, `/api/auth/me`) | Done, unit-tested |
 | API client, SSE parser (`delta`/`thinking`/`phase`/`done`/`error`), turn transport | Done, unit-tested |
 | Login, sign-up, session gate, chat preview, settings | Done |
+| Chat persistence: create/list/load conversations, append user + assistant messages, history sheet | Done |
 | Shared logic extracted to `packages/corez-shared` (intent, skills, i18n, PDF/ZIP byte builders) | Done, web + mobile import the same modules |
 | Mobile sends the same client-side intent classification as the web | Done |
 | Android bundle (`expo export --platform android`) | Passes |
@@ -120,11 +121,10 @@ gitignored; configure native behaviour in `app.json` rather than editing it.
 
 ## Known limitations at this stage
 
-- Chat turns are not persisted to `/api/chats` yet (Phase 1), so history is
-  per launch.
 - Plain-text rendering only; markdown, code blocks, attachments, dictation,
-  canvas preview, publishing, downloads, deep links and push are Phase 1–3.
-- The shared prompt-intelligence/skills package (visit `packages/corez-shared`)
-  is not extracted yet, so the mobile body sends `prompt`/`messages` and the
-  Worker normalises the missing intent block. Phase 1 wires the shared package
-  for full parity.
+  canvas preview, publishing, downloads, deep links and push are still to come.
+- The history sheet lists conversations and opens them; rename, pin, delete and
+  project folders are the next persistence increment.
+- The shared prompt-intelligence/skills package is wired into the turn body
+  (`intent`, `fineIntent`); the web's richer `contract`/`skills`/`executionPlan`
+  fields still need their client-side builders ported for full parity.

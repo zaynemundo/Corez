@@ -1,13 +1,14 @@
 /**
- * Chat screen (Phase 0 spike).
+ * Chat screen.
  *
- * Proves the riskiest assumptions with the real Worker: bearer auth, streamed
- * SSE deltas, live thinking events and abort. History persistence, markdown,
- * attachments and the canvas arrive in Phase 1.
+ * Streams `/api/ai` turns and persists every message to `/api/chats`, so a
+ * conversation survives an app restart and can be reopened from the history
+ * sheet. The stream itself is unchanged from the Phase 0 spike.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { router } from "expo-router";
 import {
+  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -23,8 +24,14 @@ import {
   MessageBubble,
   type ChatMessageModel,
 } from "@/components/MessageBubble";
-import { SessionGate } from "@/components/SessionGate";
+import { ChatHistorySheet } from "@/components/ChatHistorySheet";
 import { streamChatTurn, type ChatHistoryMessage } from "@/api/ai";
+import {
+  appendMessage,
+  createChat,
+  deriveChatTitle,
+  getChat,
+} from "@/api/chats";
 import {
   classifyIntent as classifyEngineIntent,
   classifyPublicIntent,
@@ -36,34 +43,39 @@ import { friendlyError } from "@/lib/errors";
 
 const THINKING_TOKEN_RATIO = 4;
 
-export default function ChatScreen() {
-  return (
-    <SessionGate>
-      <ChatView />
-    </SessionGate>
-  );
+interface ChatViewProps {
+  initialChatId?: string;
 }
 
-function ChatView() {
+export function ChatView({ initialChatId }: ChatViewProps) {
   const { user } = useAuth();
   const { theme } = useTheme();
   const { t } = useI18n();
   const insets = useSafeAreaInsets();
   const colors = theme.colors;
 
+  const [chatId, setChatId] = useState<string | null>(initialChatId ?? null);
   const [messages, setMessages] = useState<ChatMessageModel[]>([]);
   const messagesRef = useRef<ChatMessageModel[]>([]);
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
   const [thinkingExpanded, setThinkingExpanded] = useState(true);
   const [elapsedMs, setElapsedMs] = useState(0);
+  const [loadingChat, setLoadingChat] = useState(Boolean(initialChatId));
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const startedAtRef = useRef(0);
   const scrollRef = useRef<ScrollViewInstance | null>(null);
 
   const publishMessages = useCallback(
-    (next: ChatMessageModel[] | ((prev: ChatMessageModel[]) => ChatMessageModel[])) => {
+    (
+      next:
+        | ChatMessageModel[]
+        | ((prev: ChatMessageModel[]) => ChatMessageModel[]),
+    ) => {
       setMessages((prev) => {
         const value = typeof next === "function" ? next(prev) : next;
         messagesRef.current = value;
@@ -98,6 +110,53 @@ function ChatView() {
     };
   }, [stopTimer]);
 
+  // Load a stored conversation when the route carries an id. This effect syncs
+  // React state to the external route + server data, so the compiler rule's
+  // "setState in effect" warning is expected here.
+  const loadSeqRef = useRef(0);
+  const loadStoredChat = useCallback(
+    async (id: string) => {
+      const seq = ++loadSeqRef.current;
+      setLoadingChat(true);
+      setLoadError(null);
+      setChatId(id);
+      try {
+        const detail = await getChat(id);
+        if (seq !== loadSeqRef.current) return;
+        publishMessages(
+          (detail.messages || [])
+            .filter((message) => message.role !== "system")
+            .map((message) => ({
+              id: message.id,
+              role: message.role === "assistant" ? "assistant" : "user",
+              content: message.content,
+            })),
+        );
+      } catch (caught) {
+        if (seq === loadSeqRef.current) setLoadError(friendlyError(caught));
+      } finally {
+        if (seq === loadSeqRef.current) setLoadingChat(false);
+      }
+    },
+    [publishMessages],
+  );
+
+  useEffect(() => {
+    if (!initialChatId) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setChatId(null);
+      publishMessages([]);
+      setLoadingChat(false);
+      setLoadError(null);
+      return undefined;
+    }
+    void loadStoredChat(initialChatId);
+    return () => {
+      // A newer load (or unmount) invalidates this response.
+      loadSeqRef.current += 1;
+    };
+  }, [initialChatId, loadStoredChat, publishMessages]);
+
   const stop = useCallback(() => {
     abortRef.current?.abort();
   }, []);
@@ -106,6 +165,7 @@ function ChatView() {
     async (override?: string) => {
       const prompt = (override ?? input).trim();
       if (!prompt || streaming) return;
+      setNotice(null);
 
       const history: ChatHistoryMessage[] = messagesRef.current
         .filter((message) => !message.streaming && message.content.trim())
@@ -113,6 +173,27 @@ function ChatView() {
           role: message.role,
           content: message.content,
         }));
+
+      // Persist first: a turn that the server never accepted must not look
+      // saved locally. A brand-new chat is created with the user message.
+      let activeChatId = chatId;
+      let createdThisTurn = false;
+      try {
+        if (!activeChatId) {
+          const created = await createChat({
+            title: deriveChatTitle(prompt),
+            firstMessage: { role: "user", content: prompt },
+          });
+          activeChatId = created.id;
+          createdThisTurn = true;
+          setChatId(created.id);
+        } else {
+          await appendMessage(activeChatId, { role: "user", content: prompt });
+        }
+      } catch (caught) {
+        setNotice(friendlyError(caught));
+        return;
+      }
 
       const now = Date.now();
       const userId = `u-${now}`;
@@ -144,6 +225,7 @@ function ChatView() {
       const controller = new AbortController();
       abortRef.current = controller;
       let thinking = "";
+      let assistantText = "";
 
       // Same client-side classification the web sends: the trained public
       // label decides the legacy intent, the pattern engine supplies the
@@ -174,6 +256,7 @@ function ChatView() {
           },
           {
             onDelta: (text) => {
+              assistantText += text;
               publishMessages((prev) =>
                 prev.map((message) =>
                   message.id === assistantId
@@ -217,18 +300,36 @@ function ChatView() {
         setStreaming(false);
         abortRef.current = null;
       }
+
+      // Persist the answer (including a partial answer after Stop) and make the
+      // new chat's URL real so it can be reloaded, shared or deep-linked.
+      if (activeChatId && assistantText.trim()) {
+        try {
+          await appendMessage(activeChatId, {
+            role: "assistant",
+            content: assistantText,
+          });
+        } catch {
+          setNotice("Answer shown, but it could not be saved to this chat.");
+        }
+      }
+      if (createdThisTurn && activeChatId) {
+        router.replace(`/chat/${activeChatId}`);
+      }
     },
-    [input, streaming, publishMessages, patchMessage, stopTimer, t],
+    [chatId, input, streaming, publishMessages, patchMessage, stopTimer, t],
   );
 
-  const streams = messages.length === 0;
+  const isEmpty = messages.length === 0;
   const liveThinkingChars = messages.reduce(
     (sum, message) =>
       sum + (message.streaming ? message.thinking?.length || 0 : 0),
     0,
   );
   const liveRate =
-    elapsedMs > 0 ? liveThinkingChars / THINKING_TOKEN_RATIO / (elapsedMs / 1000) : 0;
+    elapsedMs > 0
+      ? liveThinkingChars / THINKING_TOKEN_RATIO / (elapsedMs / 1000)
+      : 0;
 
   return (
     <KeyboardAvoidingView
@@ -245,10 +346,19 @@ function ChatView() {
           },
         ]}
       >
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={t("chat.history.title")}
+          onPress={() => setHistoryOpen(true)}
+          hitSlop={12}
+          style={styles.headerButton}
+        >
+          <Text style={{ color: colors.textPrimary, fontSize: 18 }}>☰</Text>
+        </Pressable>
         <View style={styles.headerText}>
           <Text style={[styles.brand, { color: colors.textPrimary }]}>COREZ</Text>
           <Text style={[styles.previewTag, { color: colors.textMuted }]}>
-            Preview build
+            {t("common.chat.mobileTag")}
           </Text>
         </View>
         <Pressable
@@ -256,11 +366,20 @@ function ChatView() {
           accessibilityLabel={t("shell.settings")}
           onPress={() => router.push("/settings")}
           hitSlop={12}
-          style={styles.settingsButton}
+          style={styles.headerButton}
         >
           <Text style={{ color: colors.textSecondary, fontSize: 20 }}>⚙</Text>
         </Pressable>
       </View>
+
+      {notice ? (
+        <Text
+          accessibilityRole="alert"
+          style={[styles.notice, { color: colors.negative }]}
+        >
+          {notice}
+        </Text>
+      ) : null}
 
       <ScrollView
         ref={scrollRef}
@@ -272,7 +391,29 @@ function ChatView() {
           if (streaming) scrollRef.current?.scrollToEnd({ animated: false });
         }}
       >
-        {streams ? (
+        {loadingChat ? (
+          <View style={styles.centered}>
+            <ActivityIndicator color={colors.textSecondary} />
+          </View>
+        ) : loadError ? (
+          <View style={styles.centered}>
+            <Text style={[styles.loadErrorTitle, { color: colors.textPrimary }]}>
+              {t("chat.history.loadFailed")}
+            </Text>
+            <Text style={[styles.loadErrorBody, { color: colors.textSecondary }]}>
+              {loadError}
+            </Text>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => {
+                if (initialChatId) void loadStoredChat(initialChatId);
+              }}
+              style={[styles.retry, { borderColor: colors.borderHover }]}
+            >
+              <Text style={{ color: colors.textPrimary }}>{t("common.action.retry")}</Text>
+            </Pressable>
+          </View>
+        ) : isEmpty ? (
           <View style={styles.hero}>
             <Text style={[styles.heroTitle, { color: colors.textPrimary }]}>
               {t("newChat.title")}
@@ -301,7 +442,10 @@ function ChatView() {
                   ]}
                 >
                   <Text
-                    style={[styles.starterLabel, { color: colors.textSecondary }]}
+                    style={[
+                      styles.starterLabel,
+                      { color: colors.textSecondary },
+                    ]}
                   >
                     {label}
                   </Text>
@@ -330,9 +474,18 @@ function ChatView() {
           onSend={() => void send()}
           onStop={stop}
           streaming={streaming}
+          editable={!loadingChat && !loadError}
           autoFocus={false}
         />
       </View>
+
+      <ChatHistorySheet
+        visible={historyOpen}
+        activeChatId={chatId}
+        onClose={() => setHistoryOpen(false)}
+        onSelect={(id) => router.push(`/chat/${id}`)}
+        onNewChat={() => router.replace("/chat")}
+      />
     </KeyboardAvoidingView>
   );
 }
@@ -344,7 +497,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 16,
+    paddingHorizontal: 10,
     paddingBottom: 10,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
@@ -352,6 +505,12 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "baseline",
     gap: 10,
+  },
+  headerButton: {
+    minWidth: 44,
+    minHeight: 44,
+    alignItems: "center",
+    justifyContent: "center",
   },
   brand: {
     fontFamily: "Outfit_700Bold",
@@ -363,16 +522,32 @@ const styles = StyleSheet.create({
     letterSpacing: 0.06,
     textTransform: "uppercase",
   },
-  settingsButton: {
-    minWidth: 44,
-    minHeight: 44,
-    alignItems: "center",
-    justifyContent: "center",
+  notice: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    fontSize: 12.5,
   },
   messages: {
     paddingTop: 18,
     paddingBottom: 12,
     flexGrow: 1,
+  },
+  centered: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    padding: 24,
+  },
+  loadErrorTitle: { fontSize: 16, fontWeight: "600", textAlign: "center" },
+  loadErrorBody: { fontSize: 13.5, textAlign: "center", maxWidth: 320 },
+  retry: {
+    marginTop: 6,
+    borderWidth: 1,
+    borderRadius: 9999,
+    paddingHorizontal: 18,
+    minHeight: 40,
+    justifyContent: "center",
   },
   hero: {
     flex: 1,
