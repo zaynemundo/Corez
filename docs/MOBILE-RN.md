@@ -132,7 +132,11 @@ adb install -r mobile\build-artifacts\app-debug.apk
 - `EXPO_PUBLIC_API_URL` (default `https://corez.pro`) selects the Worker origin.
   Copy `.env.example` to `.env` to point at `wrangler dev` while developing.
 - `app.json` defines the Android package (`pro.corez.app`), scheme (`corez://`),
-  permissions (camera, microphone, media) and config plugins.
+  permissions (camera, microphone, media) and config plugins. The launcher
+  icon, adaptive icon foreground/monochrome and splash image now use the
+  CoreZ brand mark (white `&`-style logo on `#0a0a0a`, generated from
+  `public/corez-white.png`); the old placeholder assets were replaced.
+  ([icon preview](mobile/screenshots/app-icon.png))
 - Firebase / `google-services.json` is only needed for push notifications
   (Phase 3) and is gitignored.
 - Android App Links: `wrangler.jsonc` sets `ANDROID_APP_SHA256` to the SHA-256
