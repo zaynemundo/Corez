@@ -17,6 +17,13 @@
   // this; `wrangler dev` can override it locally with ENVIRONMENT=development.
   "vars": {
     "ENVIRONMENT": "production",
+    // Android App Links verification for the mobile client. This is the
+    // SHA-256 of the certificate that currently signs the internal test APK
+    // (mobile/build-artifacts/app-release.apk, debug certificate); replace it
+    // with the release keystore's fingerprint once a production signing key
+    // exists. Comma-separated when multiple certificates must verify, and an
+    // empty value is valid (it disables https App Links).
+    "ANDROID_APP_SHA256": "FA:C6:17:45:DC:09:03:78:6F:B9:ED:E6:2A:96:2B:39:9F:73:48:F0:BB:6F:89:9B:83:32:66:75:91:03:3B:9C",
     // Approved rollback if the primary DeepSeek upstream endpoint is
     // unavailable. Keys are tried for DeepSeek first, then for Muse.
     "OPENCODE_MODEL_FALLBACK": "muse-spark-1.3-contributor"
