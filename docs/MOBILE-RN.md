@@ -134,9 +134,10 @@ adb install -r mobile\build-artifacts\app-debug.apk
 - `app.json` defines the Android package (`pro.corez.app`), scheme (`corez://`),
   permissions (camera, microphone, media) and config plugins. The launcher
   icon, adaptive icon foreground/monochrome and splash image now use the
-  CoreZ brand mark (white `&`-style logo on `#0a0a0a`, generated from
-  `public/corez-white.png`); the mark occupies 52% of the launcher icon canvas
-  (50% adaptive foreground, 36% splash) so it has generous breathing room
+  CoreZ brand mark (white `&`-style logo on `#0a0a0a`). The mark is rendered
+  from the vector `public/corez.svg` with sharp for crisp edges and occupies
+  46% of the launcher icon canvas (44% adaptive foreground, 32% splash), with a
+  subtle radial background gradient and faint glow on the legacy icon
   ([icon preview](mobile/screenshots/app-icon.png)).
 - Firebase / `google-services.json` is only needed for push notifications
   (Phase 3) and is gitignored.
