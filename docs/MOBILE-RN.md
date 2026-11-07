@@ -16,7 +16,7 @@ the Capacitor shell in `android/` (see [MOBILE.md](./MOBILE.md)) is legacy.
 | Chat persistence: create/list/load conversations, append user + assistant messages, history sheet | Done |
 | Markdown rendering: headings, lists, tables, fenced code with copy, links, inline images | Done |
 | Attachments: camera/gallery/files, R2 upload, vision-shaped API attachments, user-bubble previews | Done |
-| Voice dictation: expo-audio recording â†’ `/api/transcribe` (Whisper), en/ar language, 120s cap | Done |
+| Voice dictation: expo-audio recording → `/api/transcribe` (Whisper), en/ar language, 120s cap | Done |
 | Chat management: rename, pin/unpin, delete, pinned/recent sections, title header | Done |
 | Offline read cache: SQLite snapshot of the chat list and open conversation, marked as an offline copy | Done |
 | Image viewer: tap an inline image for fullscreen, native share/save, copy link | Done |
@@ -29,7 +29,7 @@ the Capacitor shell in `android/` (see [MOBILE.md](./MOBILE.md)) is legacy.
 | `expo prebuild --platform android` | Passes |
 | Debug APK (`assembleDebug`) | **Passes** — `mobile/build-artifacts/app-debug.apk` (debug-signed, 4 ABIs) |
 | Release build (`assembleRelease` + R8) | **Passes** — `mobile/build-artifacts/app-release.apk` (debug-cert signed for verification; production signing needs your keystore) |
-| On-device spike | **Blocked on a connected adb device** (below) |
+| On-device spike | **Emulator-verified** install/launch/login-API/deep-link; the signed-in stream/stop/relaunch/sign-out part needs a real account (below) |
 
 The on-device spike is the Phase 0 go/no-go gate: it must prove bearer login,
 live SSE streaming, abort, and the release APK build before Phase 1 starts.
@@ -38,15 +38,15 @@ live SSE streaming, abort, and the release APK build before Phase 1 starts.
 
 Pure logic used by both clients, imported by bare specifier:
 
-- `@corez_ai/shared/intent` â€” trained public classifier, pattern/context intent
+- `@corez_ai/shared/intent` — trained public classifier, pattern/context intent
   engine, contract generation, skill registry and resolver, execution modes.
-- `@corez_ai/shared/intent/model` â€” the committed classifier model as an ES
+- `@corez_ai/shared/intent/model` — the committed classifier model as an ES
   module (the JSON artifact remains the reviewable source; a test pins them
   equal).
-- `@corez_ai/shared/intent/userFacts` â€” volunteered identity-fact extraction.
-- `@corez_ai/shared/i18n` â€” the English/Arabic dictionaries and lookup logic
+- `@corez_ai/shared/intent/userFacts` — volunteered identity-fact extraction.
+- `@corez_ai/shared/i18n` — the English/Arabic dictionaries and lookup logic
   (the web's `src/i18n/dictionaries.js` is now a re-export shim).
-- `@corez_ai/shared/artifacts` â€” PDF and ZIP builders. Bytes
+- `@corez_ai/shared/artifacts` — PDF and ZIP builders. Bytes
   (`buildResearchPdfBytes`, `createZipBytes`) are canonical because React
   Native has no Blob; the browser wrappers (`buildResearchPdfBlob`,
   `createZipBlob`) call them.
@@ -98,7 +98,7 @@ gitignored; configure native behaviour in `app.json` rather than editing it.
 ## Windows native build (short path required)
 
 React Native's native modules (`react-native-worklets`, `react-native-screens`,
-`react-native-reanimated`, â€¦) compile C++ with CMake/Ninja, and CMake mirrors
+`react-native-reanimated`, …) compile C++ with CMake/Ninja, and CMake mirrors
 the absolute source path inside `.cxx/CMakeFiles`. Under this workspace's
 OneDrive path that exceeds the Windows 260-character limit and Ninja fails with
 `mkdir(...): No such file or directory` even though the build path is valid.
@@ -178,36 +178,62 @@ always reproduces the fix. Reference:
 
 ## Prerequisites for the APK spike
 
-1. **JDK 25 (or 21)** â€” the generated project runs the Gradle 9.4.1 wrapper,
-   which supports running on JVM 17â€“26; **JDK 27 is not supported yet**. Either
+1. **JDK 25 (or 21)** — the generated project runs the Gradle 9.4.1 wrapper,
+   which supports running on JVM 17–26; **JDK 27 is not supported yet**. Either
    install `winget install --id Microsoft.OpenJDK.25` and set `JAVA_HOME`, or
    unpack a portable Temurin JDK 25 under `.tools/` (gitignored) and point
    `JAVA_HOME` at it for the build command. Do not commit a JDK.
-2. **Android SDK** â€” already installed at
+2. **Android SDK** — already installed at
    `C:\Users\ASUS PC\AppData\Local\Android\Sdk` (`platforms;android-36`,
    `build-tools;36.0.0`, `platform-tools`). React Native 0.88 targets
    compileSdk 37 / build-tools 37; Gradle auto-downloads them when the SDK
    license is accepted, otherwise install them with Android Studio's SDK
    Manager.
-3. **A device or emulator** â€” no emulator/system image is installed; a physical
-   phone with USB debugging is the fastest path. Enable Developer options â†’
-   USB debugging, set USB mode to file transfer, accept the RSA prompt, then
-   confirm the serial with `platform-tools\adb.exe devices`. `adb` lives in the
-   SDK's `platform-tools`.
-4. **Keystore** â€” for a release APK, generate `corez-mobile-release.jks` and a
+3. **A device or emulator** — a local AVD **`corez`** (Pixel 7, Android 16 / API 36,
+   google_apis x86_64) is set up in the Android SDK and was used for the
+   verification below. A physical phone with USB debugging works too: enable
+   Developer options → USB debugging, set USB mode to file transfer, accept the
+   RSA prompt, then confirm the serial with `platform-tools\adb.exe devices`.
+   `adb` lives in the SDK's `platform-tools`.
+4. **Keystore** — for a release APK, generate `corez-mobile-release.jks` and a
    gitignored `android/keystore.properties`, or use `assembleDebug` for the
    spike. Never commit either.
 
 ## Spike checklist (Phase 0 gate)
 
 0. `assembleDebug` exits 0 and produces the APK — **done** (see Build evidence).
-1. `./gradlew.bat assembleRelease` exits 0 and produces the APK.
-2. Install and launch; the splash hides into the login screen.
-3. Sign in with a real account â€” no cookie, bearer token stored in Keystore.
-4. Send "hello" â€” answer text streams token-by-token; thinking events render;
-   Stop aborts.
-5. Kill and relaunch â€” the session survives (token restored).
-6. Sign out â€” token cleared, login screen returns.
+1. `./gradlew.bat assembleRelease` exits 0 and produces the APK — **done**.
+2. Install and launch; the splash hides into the login screen — **done on the
+   emulator** (see Emulator verification).
+3. Sign in with a real account — no cookie, bearer token stored in Keystore —
+   **pending a real account**; the error path is verified.
+4. Send "hello" — answer text streams token-by-token; thinking events render;
+   Stop aborts — **pending sign-in**.
+5. Kill and relaunch — the session survives (token restored) — **pending sign-in**.
+6. Sign out — token cleared, login screen returns — **pending sign-in**.
+
+## Emulator verification (2026-11-07)
+
+The standalone release APK was installed on a freshly created Android 16 (API
+36) x86_64 emulator:
+
+1. `adb install -r mobile/build-artifacts/app-release.apk` → `Success`.
+2. `adb shell am start -n pro.corez.app/.MainActivity` → `MainActivity` is the
+   resumed activity; the dark login screen renders with the COREZ wordmark,
+   email/password fields, "Show password", Login and the Sign up link
+   ([screenshot](mobile/screenshots/login-screen.png)).
+3. Submitting `test@example.com` / `wrongpassword123` reached the production
+   API over HTTPS and rendered the server's `Invalid email or password` message
+   in the form ([screenshot](mobile/screenshots/login-invalid-credentials.png)).
+   This exercises the network path, the JSON error mapping and the native
+   login request shape end-to-end.
+4. `adb shell am start -a android.intent.action.VIEW -d "corez://chat/verification-test" pro.corez.app`
+   reopened `MainActivity` with no crash (the unauthenticated route falls back
+   to the login screen through `SessionGate`).
+
+The signed-in stream/stop/relaunch/sign-out steps and the App Links
+verification still need either the user's account credentials or a physical
+device with a verified certificate fingerprint.
 
 ## Known limitations at this stage
 
