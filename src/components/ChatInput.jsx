@@ -25,6 +25,19 @@ import {
   extractFilesFromClipboard,
   MAX_IMAGE_THUMB_BYTES,
 } from "../utils/fileAttachmentUtils";
+import {
+  decideComposerLayout,
+  measureSingleLineWidth,
+  readComposerMetrics,
+} from "../utils/composerLayout";
+
+/**
+ * The composer's textarea grows with the prompt up to this height (in px) and
+ * then scrolls inside the composer instead of pushing the conversation away.
+ * Mirrors .chat-textarea's max-height in index.css; a wrapped prompt measured
+ * taller than this uses the internal scrollbar.
+ */
+const MAX_COMPOSER_TEXTAREA_HEIGHT = 180;
 
 // Commands offered as suggestions when the user types "@".
 // Keep in sync with parseSlashCommand in services/aiService.js.
@@ -116,6 +129,9 @@ export default function ChatInput({
 
   const [isDragOverInput, setIsDragOverInput] = useState(false);
   const [isMultiline, setIsMultiline] = useState(false);
+  // Bumped when the composer's box or font changes (sidebar, canvas pane,
+  // window resize, webfont arrival) so the fit is measured again.
+  const [layoutTick, setLayoutTick] = useState(0);
   const dragInputCounterRef = useRef(0);
   const imageAttachments = attachments.filter((a) =>
     String(a.type || "").startsWith("image/"),
@@ -132,60 +148,86 @@ export default function ChatInput({
       a.uploading,
   );
 
-  useEffect(() => {
-    const textarea = refToUse.current;
-    if (!textarea) return undefined;
-
-    const resizeTextarea = () => {
-      textarea.style.height = "auto";
-      let nextHeight = Math.min(textarea.scrollHeight, 180);
-      const computedLineHeight =
-        Number.parseFloat(getComputedStyle(textarea).lineHeight) || 24;
-      // scrollHeight can be measured while the one-row flex layout is still
-      // settling, especially after a paste. Estimate wrapped lines from the
-      // actual textarea width as a fallback so a long prompt can never stay in
-      // the one-row layout with its second line clipped.
-      const charsPerLine = Math.max(
-        20,
-        Math.floor((textarea.clientWidth || 320) / 7.5),
-      );
-      const estimatedLines = Math.max(
-        1,
-        Math.ceil(String(input || "").length / charsPerLine),
-      );
-      if (estimatedLines > 1) {
-        nextHeight = Math.max(
-          nextHeight,
-          Math.min(estimatedLines * computedLineHeight + 8, 180),
-        );
-      }
-      textarea.style.height = `${nextHeight}px`;
-      setIsMultiline(
-        nextHeight > computedLineHeight + 12 ||
-          String(input).includes("\n") ||
-          estimatedLines > 1,
-      );
-    };
-
-    resizeTextarea();
-    const frame = requestAnimationFrame(resizeTextarea);
-    window.addEventListener("resize", resizeTextarea);
-    return () => {
-      cancelAnimationFrame(frame);
-      window.removeEventListener("resize", resizeTextarea);
-    };
-  }, [input, refToUse]);
-
-  // The multiline layout gives the textarea the full width. Re-measure after
-  // that reflow, otherwise the textarea keeps the taller height it needed in
-  // the one-row layout and leaves a blank band above the controls.
+  // Fit the composer's two shapes to the prompt. The layout is decided from a
+  // measurement that does not depend on the shape currently painted -- the
+  // prompt's single-line width against the width it gets beside the controls --
+  // because the multiline textarea is wider and measuring inside it made the
+  // same prompt "fit" again: the composer flipped between the shapes on every
+  // keystroke of a long prompt and could stay stuck with one line of text above
+  // a control row. This runs in a layout effect so the crossing is applied
+  // before the frame paints, and the height is measured in the shape the
+  // prompt is about to use.
   useLayoutEffect(() => {
-    if (!isMultiline) return;
     const textarea = refToUse.current;
     if (!textarea) return;
+
+    const metrics = readComposerMetrics(textarea);
+    const decision = metrics
+      ? decideComposerLayout({
+          text: input,
+          rowWidth: metrics.rowWidth,
+          measureLineWidth: (value) =>
+            measureSingleLineWidth(value, metrics.font),
+        })
+      : decideComposerLayout({ text: input, rowWidth: Number.NaN });
+
+    if (decision !== "unknown") {
+      if (decision === "multiline" && !isMultiline) {
+        // Re-render first: the height depends on the shape being switched to.
+        setIsMultiline(true);
+        return;
+      }
+      if (decision === "single" && isMultiline) {
+        // The prompt fits beside the controls again (sent, deleted, or a pane
+        // got wider): drop back to the one-row pill before measuring.
+        setIsMultiline(false);
+        return;
+      }
+    }
+
     textarea.style.height = "auto";
-    textarea.style.height = `${Math.min(textarea.scrollHeight, 180)}px`;
-  }, [isMultiline, refToUse]);
+    textarea.style.height = `${Math.min(
+      textarea.scrollHeight,
+      MAX_COMPOSER_TEXTAREA_HEIGHT,
+    )}px`;
+    // variant is a dependency because the two composers draw the prompt at
+    // different font sizes (index.css: .input-box.hero .chat-textarea); the
+    // font is part of the measurement even though it is read from CSS.
+  }, [input, isMultiline, layoutTick, refToUse, variant, hasImage]);
+
+  // The row width changes when the sidebar, the canvas pane or the window
+  // resizes, and the webfont can arrive after first paint; both need a fresh
+  // measurement. A ResizeObserver on the composer catches the pane changes a
+  // window resize event never sees.
+  useEffect(() => {
+    const form = refToUse.current?.closest("form.input-box");
+    if (!form || typeof ResizeObserver === "undefined") return undefined;
+    let lastWidth = form.clientWidth;
+    const observer = new ResizeObserver(() => {
+      const width = form.clientWidth;
+      if (Math.abs(width - lastWidth) > 0.5) {
+        lastWidth = width;
+        setLayoutTick((tick) => tick + 1);
+      }
+    });
+    observer.observe(form);
+    return () => observer.disconnect();
+  }, [refToUse]);
+
+  useEffect(() => {
+    if (typeof document === "undefined" || !document.fonts?.ready) {
+      return undefined;
+    }
+    let cancelled = false;
+    document.fonts.ready
+      .then(() => {
+        if (!cancelled) setLayoutTick((tick) => tick + 1);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Show suggestions when the input starts with "@" (optionally followed by
   // partial command text) and is not streaming.
