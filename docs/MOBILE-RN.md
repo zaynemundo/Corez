@@ -152,6 +152,10 @@ The debug APK was built in this workspace on 2026-11-07 with:
   Android debug certificate** because no release keystore is configured yet.
   It is installable for verification; a distributable release needs the
   keystore below, which flips the signing identity.
+- The refreshed release build (2026-11-07 21:30) embeds the canvas preview,
+  publishing/Sites screen and App Links configuration; the embedded
+  `assets/index.android.bundle` was checked for those features before the APK
+  was published to `mobile/build-artifacts/`.
 
 Install on a USB-connected device with `adb install -r` once `adb devices`
 lists the phone.
