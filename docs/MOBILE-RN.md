@@ -16,7 +16,7 @@ the Capacitor shell in `android/` (see [MOBILE.md](./MOBILE.md)) is legacy.
 | Chat persistence: create/list/load conversations, append user + assistant messages, history sheet | Done |
 | Markdown rendering: headings, lists, tables, fenced code with copy, links, inline images | Done |
 | Attachments: camera/gallery/files, R2 upload, vision-shaped API attachments, user-bubble previews | Done |
-| Voice dictation: expo-audio recording → `/api/transcribe` (Whisper), en/ar language, 120s cap | Done |
+| Voice dictation: expo-audio recording â†’ `/api/transcribe` (Whisper), en/ar language, 120s cap | Done |
 | Chat management: rename, pin/unpin, delete, pinned/recent sections, title header | Done |
 | Offline read cache: SQLite snapshot of the chat list and open conversation, marked as an offline copy | Done |
 | Image viewer: tap an inline image for fullscreen, native share/save, copy link | Done |
@@ -24,7 +24,9 @@ the Capacitor shell in `android/` (see [MOBILE.md](./MOBILE.md)) is legacy.
 | Mobile sends the same client-side intent classification as the web | Done |
 | Android bundle (`expo export --platform android`) | Passes |
 | `expo prebuild --platform android` | Passes |
-| Release APK build + on-device spike | **Blocked on a JDK and a device** (below) |
+| Debug APK (`assembleDebug`) | **Passes** — `mobile/build-artifacts/app-debug.apk` (debug-signed, 4 ABIs) |
+| Release APK (`assembleRelease` + keystore) | Pending a release keystore (see checklist) |
+| On-device spike | **Blocked on a connected adb device** (below) |
 
 The on-device spike is the Phase 0 go/no-go gate: it must prove bearer login,
 live SSE streaming, abort, and the release APK build before Phase 1 starts.
@@ -33,15 +35,15 @@ live SSE streaming, abort, and the release APK build before Phase 1 starts.
 
 Pure logic used by both clients, imported by bare specifier:
 
-- `@corez_ai/shared/intent` — trained public classifier, pattern/context intent
+- `@corez_ai/shared/intent` â€” trained public classifier, pattern/context intent
   engine, contract generation, skill registry and resolver, execution modes.
-- `@corez_ai/shared/intent/model` — the committed classifier model as an ES
+- `@corez_ai/shared/intent/model` â€” the committed classifier model as an ES
   module (the JSON artifact remains the reviewable source; a test pins them
   equal).
-- `@corez_ai/shared/intent/userFacts` — volunteered identity-fact extraction.
-- `@corez_ai/shared/i18n` — the English/Arabic dictionaries and lookup logic
+- `@corez_ai/shared/intent/userFacts` â€” volunteered identity-fact extraction.
+- `@corez_ai/shared/i18n` â€” the English/Arabic dictionaries and lookup logic
   (the web's `src/i18n/dictionaries.js` is now a re-export shim).
-- `@corez_ai/shared/artifacts` — PDF and ZIP builders. Bytes
+- `@corez_ai/shared/artifacts` â€” PDF and ZIP builders. Bytes
   (`buildResearchPdfBytes`, `createZipBytes`) are canonical because React
   Native has no Blob; the browser wrappers (`buildResearchPdfBlob`,
   `createZipBlob`) call them.
@@ -93,7 +95,7 @@ gitignored; configure native behaviour in `app.json` rather than editing it.
 ## Windows native build (short path required)
 
 React Native's native modules (`react-native-worklets`, `react-native-screens`,
-`react-native-reanimated`, …) compile C++ with CMake/Ninja, and CMake mirrors
+`react-native-reanimated`, â€¦) compile C++ with CMake/Ninja, and CMake mirrors
 the absolute source path inside `.cxx/CMakeFiles`. Under this workspace's
 OneDrive path that exceeds the Windows 260-character limit and Ninja fails with
 `mkdir(...): No such file or directory` even though the build path is valid.
@@ -127,6 +129,21 @@ adb install -r mobile\build-artifacts\app-debug.apk
 - Firebase / `google-services.json` is only needed for push notifications
   (Phase 3) and is gitignored.
 
+## Build evidence
+
+The debug APK was built in this workspace on 2026-11-07 with:
+
+- Gradle **9.4.1**, Android Gradle Plugin **9.2.1**, Kotlin **2.2.10**
+- Temurin **JDK 25.0.5** (portable, in `.tools/`, gitignored)
+- Android SDK: compileSdk **37**, targetSdk **36**, minSdk **24**, NDK **27.1.12297006**
+- Result: `BUILD SUCCESSFUL` (520 tasks) → `app-debug.apk`, 236 MB (all four ABIs,
+  debug overhead), V2-signed with the Android debug certificate
+  (`CN=Android Debug`), package `pro.corez.app`, versionName `0.1.0`.
+
+Install on a USB-connected device with `adb install -r` once `adb devices`
+lists the phone. A release APK additionally needs the keystore below; the
+release variant also enables R8 minification.
+
 ## NDK r27 / libc++ link workaround (required)
 
 NDK 27.1's legacy CMake toolchain in this environment does **not** consume
@@ -136,44 +153,45 @@ NDK 27.1's legacy CMake toolchain in this environment does **not** consume
 `react-native-reanimated`, `react-native-screens`, generated codegen modules)
 then fails with hundreds of undefined `std::__ndk1::*` symbols.
 
-`mobile/plugins/withCmakeStlFix.js` injects a Gradle hook into the generated
-`android/build.gradle` that forces
-`-DCMAKE_CXX_STANDARD_LIBRARIES=-latomic;-lm;-lc++_shared` into every native
-module's CMake arguments. It is registered in `app.json`, so `expo prebuild`
+`mobile/plugins/withCmakeStlFix.js` injects a Gradle task hook into the
+generated `android/build.gradle` that inserts `link_libraries(c++_shared)` into
+every native module's `CMakeLists.txt` (including generated codegen files)
+just before CMake configures it. It is registered in `app.json`, so `expo prebuild`
 always reproduces the fix. Reference:
 [software-mansion/react-native-reanimated#9444](https://github.com/software-mansion/react-native-reanimated/issues/9444).
 
 ## Prerequisites for the APK spike
 
-1. **JDK 25 (or 21)** — the generated project runs the Gradle 9.4.1 wrapper,
-   which supports running on JVM 17–26; **JDK 27 is not supported yet**. Either
+1. **JDK 25 (or 21)** â€” the generated project runs the Gradle 9.4.1 wrapper,
+   which supports running on JVM 17â€“26; **JDK 27 is not supported yet**. Either
    install `winget install --id Microsoft.OpenJDK.25` and set `JAVA_HOME`, or
    unpack a portable Temurin JDK 25 under `.tools/` (gitignored) and point
    `JAVA_HOME` at it for the build command. Do not commit a JDK.
-2. **Android SDK** — already installed at
+2. **Android SDK** â€” already installed at
    `C:\Users\ASUS PC\AppData\Local\Android\Sdk` (`platforms;android-36`,
    `build-tools;36.0.0`, `platform-tools`). React Native 0.88 targets
    compileSdk 37 / build-tools 37; Gradle auto-downloads them when the SDK
    license is accepted, otherwise install them with Android Studio's SDK
    Manager.
-3. **A device or emulator** — no emulator/system image is installed; a physical
-   phone with USB debugging is the fastest path. Enable Developer options →
+3. **A device or emulator** â€” no emulator/system image is installed; a physical
+   phone with USB debugging is the fastest path. Enable Developer options â†’
    USB debugging, set USB mode to file transfer, accept the RSA prompt, then
    confirm the serial with `platform-tools\adb.exe devices`. `adb` lives in the
    SDK's `platform-tools`.
-4. **Keystore** — for a release APK, generate `corez-mobile-release.jks` and a
+4. **Keystore** â€” for a release APK, generate `corez-mobile-release.jks` and a
    gitignored `android/keystore.properties`, or use `assembleDebug` for the
    spike. Never commit either.
 
 ## Spike checklist (Phase 0 gate)
 
+0. `assembleDebug` exits 0 and produces the APK — **done** (see Build evidence).
 1. `./gradlew.bat assembleRelease` exits 0 and produces the APK.
 2. Install and launch; the splash hides into the login screen.
-3. Sign in with a real account — no cookie, bearer token stored in Keystore.
-4. Send "hello" — answer text streams token-by-token; thinking events render;
+3. Sign in with a real account â€” no cookie, bearer token stored in Keystore.
+4. Send "hello" â€” answer text streams token-by-token; thinking events render;
    Stop aborts.
-5. Kill and relaunch — the session survives (token restored).
-6. Sign out — token cleared, login screen returns.
+5. Kill and relaunch â€” the session survives (token restored).
+6. Sign out â€” token cleared, login screen returns.
 
 ## Known limitations at this stage
 
