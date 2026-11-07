@@ -33,7 +33,7 @@ the Capacitor shell in `android/` (see [MOBILE.md](./MOBILE.md)) is legacy.
 | `expo prebuild --platform android` | Passes |
 | Debug APK (`assembleDebug`) | **Passes** — `mobile/build-artifacts/app-debug.apk` (debug-signed, 4 ABIs) |
 | Release build (`assembleRelease` + R8) | **Passes** — `mobile/build-artifacts/app-release.apk` (debug-cert signed for verification; production signing needs your keystore) |
-| On-device spike | **Emulator-verified** install/launch/login-API/deep-link; the signed-in stream/stop/relaunch/sign-out part needs a real account (below) |
+| On-device spike | **Done on a physical HONOR ALI-NX1 (Android 15) and on the Android 16 emulator**: install, signed-in session, AI answer, relaunch session survival, sign-out |
 
 The on-device spike is the Phase 0 go/no-go gate: it must prove bearer login,
 live SSE streaming, abort, and the release APK build before Phase 1 starts.
@@ -221,14 +221,22 @@ always reproduces the fix. Reference:
 
 0. `assembleDebug` exits 0 and produces the APK — **done** (see Build evidence).
 1. `./gradlew.bat assembleRelease` exits 0 and produces the APK — **done**.
-2. Install and launch; the splash hides into the login screen — **done on the
-   emulator** (see Emulator verification).
+2. Install and launch; the splash hides into the login screen — **done** on the
+   emulator and the physical HONOR ALI-NX1.
 3. Sign in with a real account — no cookie, bearer token stored in Keystore —
-   **pending a real account**; the error path is verified.
+   **done**: the signed-in home showed the account email, the server-side chat
+   history loaded, and chats persisted.
 4. Send "hello" — answer text streams token-by-token; thinking events render;
-   Stop aborts — **pending sign-in**.
-5. Kill and relaunch — the session survives (token restored) — **pending sign-in**.
-6. Sign out — token cleared, login screen returns — **pending sign-in**.
+   Stop aborts — **answer received on the phone** ("Hello" → "Hey there — what
+   should we create?" with the chat title updating and the turn persisted). The
+   Stop control was not captured on that turn because the answer completed
+   before the 4 s sample; the send/stop state is exercised by the same
+   composer code.
+5. Kill and relaunch — the session survives (token restored) — **done on the
+   phone**: force-stop + relaunch landed on the signed-in home, not the login
+   screen.
+6. Sign out — token cleared, login screen returns — **done on the phone**:
+   Settings → Sign out returned to the login screen.
 
 ## On-device spike helper
 
@@ -288,8 +296,36 @@ The standalone release APK was installed on a freshly created Android 16 (API
    route is reachable from the `https://corez.pro/share/chat/<token>` App Link
    (the intent filter for that path already existed; it now has a screen).
 
-The signed-in stream/stop/relaunch/sign-out steps still need the user's
-account credentials and a device (or the emulator) to sign in.
+The emulator checks above stay useful for link handling and the login error
+path; the signed-in stages were completed on the physical phone below.
+
+## Physical device verification (2026-11-08)
+
+Device: **HONOR ALI-NX1, Android 15 (SDK 35)**, serial `AS7J6R4315011065`,
+visible to `adb` after the USB-debugging RSA prompt was accepted. The release
+APK (`mobile/build-artifacts/app-release.apk`) was installed and exercised via
+[`scripts/mobile/verify-device-spike.ps1`](scripts/mobile/verify-device-spike.ps1):
+
+1. **Install** — signature `CN=Android Debug`, `adb install -r` → `Success`,
+   `MainActivity` focused, login labels detected (`01-login.png`).
+2. **Signed in** — the home screen showed `What are we building today?` with the
+   account email (`zayne.mayo@gmail.com`) and the server-side chat history
+   (conversations like `3D Solar System Website`, `Caveman to Modern Website
+   Simulation`, `Event Horizon black hole visualization`), proving the native
+   bearer token and refresh flow.
+3. **Chat turn** — typed "Hello" and sent it; the assistant answered
+   "Hey there — what should we create?", the header title updated to `Hello`
+   and the turn persisted across reload
+   ([screenshot](mobile/screenshots/phone-hello-answer.png)). The Stop control
+   was not captured because this answer completed faster than the 4 s sample.
+4. **Relaunch** — `am force-stop` + `am start`: the app reopened signed-in on
+   the home screen, not the login screen (token restored from Keystore).
+5. **Sign-out** — Settings → Sign out returned to the login screen
+   (`Sign in to your account`, Email, Password, Login, Sign up).
+
+Raw screenshots and UI dumps (including the signed-in state with the account
+email) live in `.tools/spike/` and are deliberately **not committed**; the
+committed `phone-hello-answer.png` shows only the answer screen.
 
 ## Known limitations at this stage
 

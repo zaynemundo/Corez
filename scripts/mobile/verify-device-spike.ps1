@@ -87,13 +87,20 @@ function Find-NodeCenter([string]$serial, [string]$needle) {
     $xml = Get-Content (Join-Path $outDir 'last-ui.xml') -Raw -ErrorAction SilentlyContinue
     if (-not $xml) { return $null }
     foreach ($line in ($xml -replace '><', ">`n<" -split "`n")) {
-        if ($line -match 'bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"' -and
-            ($line -match 'content-desc="([^"]*)"' -and $matches[1] -like "*$needle*" -or
-             $line -match 'text="([^"]*)"' -and $matches[1] -like "*$needle*")) {
-            $left = [int]$matches[1]; $top = [int]$matches[2]; $right = [int]$matches[3]; $bottom = [int]$matches[4]
+        $bounds = $null
+        if ($line -match 'bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"') {
+            $bounds = @([int]$matches[1], [int]$matches[2], [int]$matches[3], [int]$matches[4])
+        }
+        $description = ''
+        if ($line -match 'content-desc="([^"]*)"') { $description = $matches[1] }
+        $label = ''
+        if ($line -match 'text="([^"]*)"') { $label = $matches[1] }
+        $found = (($description -and $description -like "*$needle*") -or
+                  ($label -and $label -like "*$needle*"))
+        if ($found -and $bounds) {
             return [pscustomobject]@{
-                X = [int](($left + $right) / 2)
-                Y = [int](($top + $bottom) / 2)
+                X = [int](($bounds[0] + $bounds[2]) / 2)
+                Y = [int](($bounds[1] + $bounds[3]) / 2)
             }
         }
     }
@@ -162,7 +169,7 @@ switch ($Stage) {
     'chat' {
         Write-Stage 'send hello, verify streaming and Stop'
         if (-not (Assert-SignedInUI $serial)) { throw 'Still on the login screen. Sign in on the phone first.' }
-        $input = Find-NodeCenter $serial 'Message'
+        $input = Find-NodeCenter $serial 'Ask Corez'
         if ($input) { & $adb -s $serial shell input tap $input.X $input.Y; Start-Sleep -Milliseconds 500 }
         & $adb -s $serial shell input text 'hello'
         Start-Sleep -Milliseconds 500

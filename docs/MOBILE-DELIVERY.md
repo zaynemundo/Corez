@@ -1,8 +1,8 @@
 # CoreZ Mobile — delivery summary
 
 Status as of 2026-11-08. The Android client, the Worker auth changes and the
-shared package are complete, tested and pushed. One Phase 0 check — the
-signed-in device spike — is still waiting for an authorized phone.
+shared package are complete, tested and pushed. The Phase 0 gate is complete:
+the signed-in spike passes on a physical HONOR ALI-NX1 (Android 15).
 
 ## What is delivered
 
@@ -14,7 +14,7 @@ signed-in device spike — is still waiting for an authorized phone.
 | Android App Links | `worker/index.js`, `wrangler.jsonc`, `mobile/app.json` | Live and verified on Android 16 (state `1024`) |
 | Release APK | `mobile/build-artifacts/app-release.apk` | 98.18 MB, V2 debug-certificate signed |
 | Build automation | `scripts/mobile/build-apk-windows.ps1` | Validated from a clean directory (641/641 tasks, 12m58s) |
-| Device spike helper | `scripts/mobile/verify-device-spike.ps1` | Install stage exercised on the emulator |
+| Device spike helper | `scripts/mobile/verify-device-spike.ps1` | Validated end-to-end on a physical HONOR ALI-NX1 (install, read-only chat/Stop sampling, relaunch, sign-out) |
 
 ### Mobile features
 
@@ -54,6 +54,13 @@ signed-in device spike — is still waiting for an authorized phone.
 - Clean-path build: `build-apk-windows.ps1 -Variant release -Destination
   C:\czbuild-fresh` produced the APK from an empty directory with no manual
   steps.
+- **Physical phone (HONOR ALI-NX1, Android 15, SDK 35)**: release APK installed
+  and launched; signed-in home showed the account email and server-side chat
+  history; a "Hello" turn was answered by the model and persisted; force-stop +
+  relaunch restored the session without a login; Settings → Sign out returned to
+  the login screen. Raw evidence lives in `.tools/spike/` (gitignored); the
+  committed [phone answer screenshot](mobile/screenshots/phone-hello-answer.png)
+  contains no account details.
 
 ## Install
 
@@ -64,11 +71,11 @@ signed-in device spike — is still waiting for an authorized phone.
 
 ## Known gaps / next steps
 
-1. **Signed-in Phase 0 spike** — login → streaming → Stop → relaunch session
-   survival → sign-out. Needs an authorized USB device with adb access and the
-   user's account (or permission to create a test account). Use
-   `scripts/mobile/verify-device-spike.ps1` stages `install`, `chat`,
-   `relaunch`, `signout`.
+1. **Stop-button capture on the phone** — the signed-in turn completed faster
+   than the 4 s sampling window, so the Stop control was not captured even
+   though the composer does render it while a stream is running. Re-run
+   `verify-device-spike.ps1 -Stage chat` with a slower prompt if that screenshot
+   matters.
 2. **Production signing** — replace the debug certificate with a release
    keystore and a gitignored `android/keystore.properties`; update
    `ANDROID_APP_SHA256` on the Worker to the new fingerprint.
