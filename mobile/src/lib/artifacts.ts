@@ -22,6 +22,16 @@ export function isRenderableHtml(code: string): boolean {
   );
 }
 
+/** Read the document title, falling back to a stable label. */
+export function artifactTitle(code: string, fallback = "Untitled Application"): string {
+  const match = String(code || "").match(/<title[^>]*>([^<]{1,120})<\/title>/i);
+  const title = (match?.[1] || "")
+    .replace(/&amp;/g, "&")
+    .replace(/\s+/g, " ")
+    .trim();
+  return title || fallback;
+}
+
 /** Filesystem-safe name for a saved artifact, preferring the document title. */
 export function artifactFileName(
   code: string,

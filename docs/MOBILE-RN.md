@@ -21,6 +21,7 @@ the Capacitor shell in `android/` (see [MOBILE.md](./MOBILE.md)) is legacy.
 | Offline read cache: SQLite snapshot of the chat list and open conversation, marked as an offline copy | Done |
 | Image viewer: tap an inline image for fullscreen, native share/save, copy link | Done |
 | Canvas preview: complete HTML artifacts open in a WebView; copy HTML and native share/save from chat | Done |
+| Publishing: publish from the canvas with a public link; Sites screen lists, opens, shares, copies and unpublishes pages | Done |
 | Shared logic extracted to `packages/corez-shared` (intent, skills, i18n, PDF/ZIP byte builders) | Done, web + mobile import the same modules |
 | Mobile sends the same client-side intent classification as the web | Done |
 | Android bundle (`expo export --platform android`) | Passes |
@@ -200,8 +201,8 @@ always reproduces the fix. Reference:
 
 ## Known limitations at this stage
 
-- Publishing/sites analytics, deep links, push and the dedicated image-generation
-  UI are still to come.
+- Deep links, push notifications and the dedicated image-generation UI are
+  still to come.
 - The canvas renders complete HTML documents and canvas games. The web's
   multi-page document splitting and React/JSX compilation pipeline are not
   ported yet, so those artifacts preview as their raw first document.

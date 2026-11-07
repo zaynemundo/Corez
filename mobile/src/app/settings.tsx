@@ -72,6 +72,24 @@ function SettingsView() {
           </Text>
         </Section>
 
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => router.push("/sites")}
+          style={({ pressed }) => [
+            styles.sitesRow,
+            {
+              backgroundColor: colors.bgSecondary,
+              borderColor: colors.border,
+              opacity: pressed ? 0.75 : 1,
+            },
+          ]}
+        >
+          <Text style={[styles.sitesRowLabel, { color: colors.textPrimary }]}>
+            {t("sites.title")}
+          </Text>
+          <Text style={{ color: colors.textMuted, fontSize: 18 }}>›</Text>
+        </Pressable>
+
         <Section title={t("settings.theme")}>
           <View style={styles.options}>
             {themeModes.map((entry) => {
@@ -229,6 +247,16 @@ const styles = StyleSheet.create({
   sectionBody: { gap: 8 },
   value: { fontSize: 14.5 },
   hint: { fontSize: 12.5, lineHeight: 18 },
+  sitesRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    minHeight: 50,
+  },
+  sitesRowLabel: { fontSize: 14.5, fontWeight: "600" },
   options: {
     flexDirection: "row",
     flexWrap: "wrap",

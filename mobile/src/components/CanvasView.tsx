@@ -11,6 +11,7 @@ import {
   Linking,
   Modal,
   Pressable,
+  Share,
   StyleSheet,
   Text,
   View,
@@ -19,8 +20,10 @@ import { WebView } from "react-native-webview";
 import { SafeAreaInsetsContext } from "react-native-safe-area-context";
 import { useTheme } from "@/state/theme";
 import { useI18n } from "@/i18n";
-import { artifactFileName } from "@/lib/artifacts";
+import { artifactFileName, artifactTitle } from "@/lib/artifacts";
 import { copyText, shareTextFile } from "@/lib/downloads";
+import { publishHtml } from "@/api/publish";
+import { friendlyError } from "@/lib/errors";
 
 interface CanvasViewProps {
   html: string | null;
@@ -40,6 +43,8 @@ export function CanvasView({ html, onClose }: CanvasViewProps) {
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState<string | null>(null);
+  const [publishing, setPublishing] = useState(false);
+  const [publishedUrl, setPublishedUrl] = useState<string | null>(null);
 
   if (!html) return null;
 
@@ -61,6 +66,38 @@ export function CanvasView({ html, onClose }: CanvasViewProps) {
     if (!ok) setStatus(t("canvas.failed"));
   };
 
+  const publish = async () => {
+    if (publishing) return;
+    setPublishing(true);
+    setStatus(null);
+    try {
+      const result = await publishHtml({
+        html,
+        title: artifactTitle(html),
+      });
+      setPublishedUrl(result.url);
+    } catch (caught) {
+      setStatus(friendlyError(caught, t("canvas.publishFailed")));
+    } finally {
+      setPublishing(false);
+    }
+  };
+
+  const copyPublishedUrl = async () => {
+    if (!publishedUrl) return;
+    const ok = await copyText(publishedUrl);
+    setStatus(ok ? t("canvas.linkCopied") : t("canvas.failed"));
+  };
+
+  const sharePublishedUrl = async () => {
+    if (!publishedUrl) return;
+    try {
+      await Share.share({ message: publishedUrl });
+    } catch {
+      setStatus(t("canvas.failed"));
+    }
+  };
+
   return (
     <Modal
       visible
@@ -80,6 +117,24 @@ export function CanvasView({ html, onClose }: CanvasViewProps) {
             {t("canvas.previewTitle")}
           </Text>
           <View style={styles.actions}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t("canvas.publish")}
+              disabled={publishing}
+              onPress={() => void publish()}
+              hitSlop={8}
+              style={styles.action}
+            >
+              {publishing ? (
+                <ActivityIndicator size="small" color={colors.textSecondary} />
+              ) : (
+                <Text
+                  style={[styles.actionLabel, { color: colors.textPrimary }]}
+                >
+                  {t("canvas.publish")}
+                </Text>
+              )}
+            </Pressable>
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={t("canvas.copy")}
@@ -130,6 +185,52 @@ export function CanvasView({ html, onClose }: CanvasViewProps) {
           >
             {status}
           </Text>
+        ) : null}
+
+        {publishedUrl ? (
+          <View
+            style={[
+              styles.publishedBar,
+              { borderBottomColor: colors.border },
+            ]}
+          >
+            <Text
+              numberOfLines={1}
+              style={[styles.publishedUrl, { color: colors.textSecondary }]}
+            >
+              {publishedUrl}
+            </Text>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t("canvas.open")}
+              onPress={() => void Linking.openURL(publishedUrl).catch(() => {})}
+              hitSlop={8}
+            >
+              <Text style={[styles.publishedAction, { color: colors.textPrimary }]}>
+                {t("canvas.open")}
+              </Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t("canvas.copyLink")}
+              onPress={() => void copyPublishedUrl()}
+              hitSlop={8}
+            >
+              <Text style={[styles.publishedAction, { color: colors.textPrimary }]}>
+                {t("canvas.copyLink")}
+              </Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t("canvas.shareLink")}
+              onPress={() => void sharePublishedUrl()}
+              hitSlop={8}
+            >
+              <Text style={[styles.publishedAction, { color: colors.textPrimary }]}>
+                {t("canvas.shareLink")}
+              </Text>
+            </Pressable>
+          </View>
         ) : null}
 
         <View style={styles.webviewWrap}>
@@ -197,6 +298,16 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     fontSize: 12.5,
   },
+  publishedBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  publishedUrl: { flex: 1, fontSize: 12 },
+  publishedAction: { fontSize: 12, fontWeight: "700" },
   webviewWrap: { flex: 1 },
   loading: {
     position: "absolute",
