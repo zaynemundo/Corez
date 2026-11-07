@@ -192,6 +192,21 @@ function SitesView() {
                 </Pressable>
                 <Pressable
                   accessibilityRole="button"
+                  accessibilityLabel={`${t("sites.stats")} ${page.title || page.slug}`}
+                  onPress={() =>
+                    router.push({
+                      pathname: "/sites/[slug]",
+                      params: { slug: page.slug },
+                    })
+                  }
+                  style={[styles.action, { borderColor: colors.borderHover }]}
+                >
+                  <Text style={[styles.actionLabel, { color: colors.textPrimary }]}>
+                    {t("sites.stats")}
+                  </Text>
+                </Pressable>
+                <Pressable
+                  accessibilityRole="button"
                   accessibilityLabel={`${t("sites.copy")} ${page.title || page.slug}`}
                   onPress={() => void copyLink(page)}
                   style={[styles.action, { borderColor: colors.borderHover }]}
