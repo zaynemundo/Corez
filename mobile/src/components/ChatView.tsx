@@ -13,6 +13,7 @@ import {
   Platform,
   Pressable,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   View,
@@ -32,6 +33,7 @@ import {
   deriveChatTitle,
   getChatWithCache,
 } from "@/api/chats";
+import { createChatShare } from "@/api/shareChat";
 import {
   buildAttachmentPrompt,
   pickAttachment,
@@ -75,6 +77,7 @@ export function ChatView({ initialChatId }: ChatViewProps) {
   const [offlineNotice, setOfflineNotice] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [sharingChat, setSharingChat] = useState(false);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [attachmentBusy, setAttachmentBusy] = useState(false);
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
@@ -82,6 +85,24 @@ export function ChatView({ initialChatId }: ChatViewProps) {
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const startedAtRef = useRef(0);
   const scrollRef = useRef<ScrollViewInstance | null>(null);
+
+  const shareChat = useCallback(async () => {
+    if (sharingChat) return;
+    if (!chatId) {
+      setNotice(t("chat.share.empty"));
+      return;
+    }
+    setSharingChat(true);
+    setNotice(null);
+    try {
+      const result = await createChatShare(chatId);
+      if (result.url) await Share.share({ message: result.url });
+    } catch (caught) {
+      setNotice(friendlyError(caught, t("chat.share.failed")));
+    } finally {
+      setSharingChat(false);
+    }
+  }, [chatId, sharingChat, t]);
 
   const publishMessages = useCallback(
     (
@@ -499,15 +520,31 @@ export function ChatView({ initialChatId }: ChatViewProps) {
             </Text>
           )}
         </View>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={t("shell.settings")}
-          onPress={() => router.push("/settings")}
-          hitSlop={12}
-          style={styles.headerButton}
-        >
-          <Text style={{ color: colors.textSecondary, fontSize: 20 }}>⚙</Text>
-        </Pressable>
+        <View style={styles.headerActions}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t("chat.share.action")}
+            onPress={() => void shareChat()}
+            disabled={sharingChat}
+            hitSlop={12}
+            style={styles.headerButton}
+          >
+            {sharingChat ? (
+              <ActivityIndicator size="small" color={colors.textSecondary} />
+            ) : (
+              <Text style={{ color: colors.textSecondary, fontSize: 18 }}>↗</Text>
+            )}
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t("shell.settings")}
+            onPress={() => router.push("/settings")}
+            hitSlop={12}
+            style={styles.headerButton}
+          >
+            <Text style={{ color: colors.textSecondary, fontSize: 20 }}>⚙</Text>
+          </Pressable>
+        </View>
       </View>
 
       {notice ? (
@@ -684,6 +721,10 @@ const styles = StyleSheet.create({
     minHeight: 44,
     alignItems: "center",
     justifyContent: "center",
+  },
+  headerActions: {
+    flexDirection: "row",
+    alignItems: "center",
   },
   brand: {
     fontFamily: "Outfit_700Bold",
