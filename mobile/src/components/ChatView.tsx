@@ -33,6 +33,13 @@ import {
   getChat,
 } from "@/api/chats";
 import {
+  buildAttachmentPrompt,
+  pickAttachment,
+  toApiAttachments,
+  type Attachment,
+  type AttachmentSource,
+} from "@/lib/attachments";
+import {
   classifyIntent as classifyEngineIntent,
   classifyPublicIntent,
 } from "@corez_ai/shared/intent";
@@ -65,6 +72,9 @@ export function ChatView({ initialChatId }: ChatViewProps) {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [attachmentBusy, setAttachmentBusy] = useState(false);
+  const [attachmentError, setAttachmentError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const startedAtRef = useRef(0);
@@ -130,6 +140,31 @@ export function ChatView({ initialChatId }: ChatViewProps) {
               id: message.id,
               role: message.role === "assistant" ? "assistant" : "user",
               content: message.content,
+              attachments: Array.isArray(message.attachments)
+                ? message.attachments.map((raw, index) => {
+                    const value = (raw ?? {}) as Record<string, unknown>;
+                    return {
+                      id:
+                        typeof value.id === "string"
+                          ? value.id
+                          : `${message.id}-att-${index}`,
+                      name:
+                        typeof value.name === "string" ? value.name : "file",
+                      type:
+                        typeof value.type === "string" ? value.type : undefined,
+                      size:
+                        typeof value.size === "number" ? value.size : undefined,
+                      thumb:
+                        typeof value.thumb === "string"
+                          ? value.thumb
+                          : undefined,
+                      assetUrl:
+                        typeof value.assetUrl === "string"
+                          ? value.assetUrl
+                          : undefined,
+                    };
+                  })
+                : undefined,
             })),
         );
       } catch (caught) {
@@ -161,17 +196,56 @@ export function ChatView({ initialChatId }: ChatViewProps) {
     abortRef.current?.abort();
   }, []);
 
+  const addAttachment = useCallback(async (source: AttachmentSource) => {
+    setAttachmentError(null);
+    setAttachmentBusy(true);
+    try {
+      const attachment = await pickAttachment(source);
+      if (attachment) {
+        setAttachments((prev) => [...prev, attachment].slice(0, 6));
+      }
+    } catch (caught) {
+      setAttachmentError(friendlyError(caught));
+    } finally {
+      setAttachmentBusy(false);
+    }
+  }, []);
+
+  const removeAttachment = useCallback((id: string) => {
+    setAttachments((prev) => prev.filter((item) => item.id !== id));
+  }, []);
+
   const send = useCallback(
     async (override?: string) => {
-      const prompt = (override ?? input).trim();
-      if (!prompt || streaming) return;
+      const trimmed = (override ?? input).trim();
+      if (streaming || (!trimmed && attachments.length === 0)) return;
       setNotice(null);
+
+      const turnAttachments = attachments;
+      const prompt =
+        trimmed || turnAttachments.map((item) => item.name).join(", ");
+      const apiPrompt = `${prompt}${buildAttachmentPrompt(turnAttachments)}`;
+      const apiAttachments = toApiAttachments(turnAttachments);
+      const displayAttachments = turnAttachments.map(
+        ({ id, name, type, size, thumb, assetUrl, assetKey }) => ({
+          id,
+          name,
+          type,
+          size,
+          thumb,
+          assetUrl,
+          assetKey,
+        }),
+      );
 
       const history: ChatHistoryMessage[] = messagesRef.current
         .filter((message) => !message.streaming && message.content.trim())
         .map((message) => ({
           role: message.role,
           content: message.content,
+          ...(message.attachments && message.attachments.length > 0
+            ? { attachments: message.attachments }
+            : {}),
         }));
 
       // Persist first: a turn that the server never accepted must not look
@@ -182,13 +256,25 @@ export function ChatView({ initialChatId }: ChatViewProps) {
         if (!activeChatId) {
           const created = await createChat({
             title: deriveChatTitle(prompt),
-            firstMessage: { role: "user", content: prompt },
+            firstMessage: {
+              role: "user",
+              content: prompt,
+              ...(displayAttachments.length > 0
+                ? { attachments: displayAttachments }
+                : {}),
+            },
           });
           activeChatId = created.id;
           createdThisTurn = true;
           setChatId(created.id);
         } else {
-          await appendMessage(activeChatId, { role: "user", content: prompt });
+          await appendMessage(activeChatId, {
+            role: "user",
+            content: prompt,
+            ...(displayAttachments.length > 0
+              ? { attachments: displayAttachments }
+              : {}),
+          });
         }
       } catch (caught) {
         setNotice(friendlyError(caught));
@@ -202,6 +288,9 @@ export function ChatView({ initialChatId }: ChatViewProps) {
         id: userId,
         role: "user",
         content: prompt,
+        ...(displayAttachments.length > 0
+          ? { attachments: displayAttachments }
+          : {}),
       };
       const assistantMessage: ChatMessageModel = {
         id: assistantId,
@@ -213,6 +302,8 @@ export function ChatView({ initialChatId }: ChatViewProps) {
 
       publishMessages((prev) => [...prev, userMessage, assistantMessage]);
       setInput("");
+      setAttachments([]);
+      setAttachmentError(null);
       setStreaming(true);
       setThinkingExpanded(true);
       setElapsedMs(0);
@@ -265,8 +356,15 @@ export function ChatView({ initialChatId }: ChatViewProps) {
       try {
         const result = await streamChatTurn(
           {
-            prompt,
-            messages: history,
+            prompt: apiPrompt,
+            messages: [
+              ...history,
+              {
+                role: "user" as const,
+                content: apiPrompt,
+                attachments: apiAttachments,
+              },
+            ],
             intent: {
               type: publicIntent.label,
               confidence: publicIntent.confidence,
@@ -331,7 +429,7 @@ export function ChatView({ initialChatId }: ChatViewProps) {
         router.replace(`/chat/${activeChatId}`);
       }
     },
-    [chatId, input, streaming, publishMessages, patchMessage, stopTimer, t],
+    [attachments, chatId, input, streaming, publishMessages, patchMessage, stopTimer, t],
   );
 
   const isEmpty = messages.length === 0;
@@ -490,6 +588,11 @@ export function ChatView({ initialChatId }: ChatViewProps) {
           streaming={streaming}
           editable={!loadingChat && !loadError}
           autoFocus={false}
+          attachments={attachments}
+          attachmentBusy={attachmentBusy}
+          attachmentError={attachmentError}
+          onPickAttachment={(source) => void addAttachment(source)}
+          onRemoveAttachment={removeAttachment}
         />
       </View>
 
@@ -497,8 +600,16 @@ export function ChatView({ initialChatId }: ChatViewProps) {
         visible={historyOpen}
         activeChatId={chatId}
         onClose={() => setHistoryOpen(false)}
-        onSelect={(id) => router.push(`/chat/${id}`)}
-        onNewChat={() => router.replace("/chat")}
+        onSelect={(id) => {
+          setAttachments([]);
+          setAttachmentError(null);
+          router.push(`/chat/${id}`);
+        }}
+        onNewChat={() => {
+          setAttachments([]);
+          setAttachmentError(null);
+          router.replace("/chat");
+        }}
       />
     </KeyboardAvoidingView>
   );

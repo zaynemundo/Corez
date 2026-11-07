@@ -47,7 +47,11 @@ export async function listChats(): Promise<ListedChats> {
 
 export async function createChat(input: {
   title?: string;
-  firstMessage?: { role: "user"; content: string };
+  firstMessage?: {
+    role: "user";
+    content: string;
+    attachments?: unknown[];
+  };
 } = {}): Promise<ChatSummary> {
   return requestJson<ChatSummary>(BASE, { method: "POST", body: input });
 }

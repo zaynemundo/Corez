@@ -5,11 +5,20 @@
  * message). The full markdown renderer, code-block actions and attachments
  * land in Phase 1; the layout here is already the final one.
  */
-import { StyleSheet, Text, View } from "react-native";
+import { Image, StyleSheet, Text, View } from "react-native";
 import { ThinkingPanel } from "./ThinkingPanel";
 import { MarkdownView } from "./MarkdownView";
 import { useTheme } from "@/state/theme";
 import { useI18n } from "@/i18n";
+
+export interface MessageAttachment {
+  id?: string;
+  name: string;
+  type?: string;
+  size?: number;
+  thumb?: string;
+  assetUrl?: string;
+}
 
 export interface ChatMessageModel {
   id: string;
@@ -19,6 +28,7 @@ export interface ChatMessageModel {
   thinkingSeconds?: number;
   streaming?: boolean;
   error?: string | null;
+  attachments?: MessageAttachment[];
 }
 
 interface MessageBubbleProps {
@@ -59,6 +69,45 @@ export function MessageBubble({
           >
             {message.content}
           </Text>
+          {message.attachments && message.attachments.length > 0 ? (
+            <View style={styles.attachmentRow}>
+              {message.attachments.map((attachment, index) => (
+                <View key={attachment.id || `${attachment.name}-${index}`}>
+                  {attachment.thumb ? (
+                    <Image
+                      source={{ uri: attachment.thumb }}
+                      style={[
+                        styles.attachmentImage,
+                        { borderColor: colors.border },
+                      ]}
+                      resizeMode="cover"
+                      accessibilityLabel={attachment.name}
+                    />
+                  ) : (
+                    <View
+                      style={[
+                        styles.attachmentFile,
+                        {
+                          backgroundColor: colors.bgCard,
+                          borderColor: colors.border,
+                        },
+                      ]}
+                    >
+                      <Text
+                        numberOfLines={1}
+                        style={[
+                          styles.attachmentFileName,
+                          { color: colors.textSecondary },
+                        ]}
+                      >
+                        📄 {attachment.name}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+              ))}
+            </View>
+          ) : null}
         </View>
       </View>
     );
@@ -117,6 +166,26 @@ const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: 22,
   },
+  attachmentRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+    marginTop: 8,
+  },
+  attachmentImage: {
+    width: 88,
+    height: 88,
+    borderRadius: 8,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  attachmentFile: {
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    maxWidth: 180,
+  },
+  attachmentFileName: { fontSize: 12 },
   assistantRow: {
     marginBottom: 22,
     paddingHorizontal: 16,

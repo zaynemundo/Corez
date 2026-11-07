@@ -15,6 +15,7 @@ the Capacitor shell in `android/` (see [MOBILE.md](./MOBILE.md)) is legacy.
 | Login, sign-up, session gate, chat preview, settings | Done |
 | Chat persistence: create/list/load conversations, append user + assistant messages, history sheet | Done |
 | Markdown rendering: headings, lists, tables, fenced code with copy, links, inline images | Done |
+| Attachments: camera/gallery/files, R2 upload, vision-shaped API attachments, user-bubble previews | Done |
 | Shared logic extracted to `packages/corez-shared` (intent, skills, i18n, PDF/ZIP byte builders) | Done, web + mobile import the same modules |
 | Mobile sends the same client-side intent classification as the web | Done |
 | Android bundle (`expo export --platform android`) | Passes |
@@ -122,8 +123,11 @@ gitignored; configure native behaviour in `app.json` rather than editing it.
 
 ## Known limitations at this stage
 
-- Attachments (camera/gallery/files), voice dictation, image-generation UI,
-  canvas preview, publishing, downloads, deep links and push are still to come.
+- Voice dictation, image-generation UI, canvas preview, publishing, downloads,
+  deep links and push are still to come.
+- Attachments cover images (camera/gallery) and files (text content for small
+  text-like documents, metadata for binaries); PDF text extraction is not
+  ported yet.
 - Markdown rendering covers the answer format but not the web's one-click
   code-file save/download actions.
 - The history sheet lists conversations and opens them; rename, pin, delete and
