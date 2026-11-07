@@ -26,10 +26,11 @@ import { useI18n } from "@/i18n";
 import { resolveAssetUrl } from "@/lib/urls";
 import {
   artifactFileName,
+  classifyDownloadableAsset,
   isHtmlLanguage,
   isRenderableHtml,
 } from "@/lib/artifacts";
-import { shareTextFile } from "@/lib/downloads";
+import { downloadAndShareFile, shareTextFile } from "@/lib/downloads";
 import { ImageFullscreenModal } from "./ImageFullscreenModal";
 import { CanvasView } from "./CanvasView";
 
@@ -235,7 +236,15 @@ function Inline({ tokens }: { tokens?: Token[] }) {
                 style={[styles.link, { color: colors.textPrimary }]}
                 onPress={() => {
                   const url = resolveMarkdownUrl(href);
-                  if (url) void Linking.openURL(url).catch(() => {});
+                  if (!url) return;
+                  const downloadable = classifyDownloadableAsset(url);
+                  if (downloadable) {
+                    void downloadAndShareFile(downloadable).then((ok) => {
+                      if (!ok) void Linking.openURL(url).catch(() => {});
+                    });
+                    return;
+                  }
+                  void Linking.openURL(url).catch(() => {});
                 }}
               >
                 <Inline tokens={(token as { tokens?: Token[] }).tokens} />

@@ -2,11 +2,17 @@ import * as Sharing from "expo-sharing";
 import * as Clipboard from "expo-clipboard";
 import {
   copyText,
+  downloadAndShareFile,
   safeFileName,
   shareTextFile,
 } from "../downloads";
 
 const mockWrite = jest.fn(async (_content: unknown) => undefined);
+const mockDownload = jest.fn(
+  async (_url: string, destination: { uri: string }) => ({
+    uri: destination.uri,
+  }),
+);
 
 jest.mock("expo-file-system", () => {
   class File {
@@ -18,6 +24,9 @@ jest.mock("expo-file-system", () => {
     delete() {}
     write(content: unknown) {
       return mockWrite(content);
+    }
+    static downloadFileAsync(url: string, destination: { uri: string }) {
+      return mockDownload(url, destination);
     }
   }
   return { File, Paths: { cache: "/cache" } };
@@ -40,6 +49,7 @@ const clipboardMock = Clipboard as unknown as { setStringAsync: jest.Mock };
 
 beforeEach(() => {
   mockWrite.mockClear();
+  mockDownload.mockClear();
   sharingMock.isAvailableAsync.mockReset();
   sharingMock.shareAsync.mockReset();
   sharingMock.isAvailableAsync.mockResolvedValue(true);
@@ -95,5 +105,44 @@ describe("copyText", () => {
   it("reports clipboard failure", async () => {
     clipboardMock.setStringAsync.mockRejectedValue(new Error("denied"));
     await expect(copyText("hello")).resolves.toBe(false);
+  });
+});
+
+describe("downloadAndShareFile", () => {
+  it("downloads the asset and opens the share sheet", async () => {
+    const ok = await downloadAndShareFile({
+      url: "https://corez.pro/api/assets/uid/report.pdf",
+      fileName: "report.pdf",
+    });
+    expect(ok).toBe(true);
+    expect(mockDownload).toHaveBeenCalledWith(
+      "https://corez.pro/api/assets/uid/report.pdf",
+      expect.objectContaining({ uri: expect.stringContaining("/cache/") }),
+    );
+    expect(sharingMock.shareAsync).toHaveBeenCalledWith(
+      expect.stringContaining("/cache/"),
+    );
+  });
+
+  it("returns false when the download fails", async () => {
+    mockDownload.mockRejectedValueOnce(new Error("404"));
+    await expect(
+      downloadAndShareFile({
+        url: "https://corez.pro/api/assets/uid/report.pdf",
+        fileName: "report.pdf",
+      }),
+    ).resolves.toBe(false);
+    expect(sharingMock.shareAsync).not.toHaveBeenCalled();
+  });
+
+  it("returns false when sharing is unavailable", async () => {
+    sharingMock.isAvailableAsync.mockResolvedValue(false);
+    await expect(
+      downloadAndShareFile({
+        url: "https://corez.pro/api/assets/uid/report.pdf",
+        fileName: "report.pdf",
+      }),
+    ).resolves.toBe(false);
+    expect(mockDownload).not.toHaveBeenCalled();
   });
 });

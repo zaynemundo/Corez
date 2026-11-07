@@ -32,6 +32,55 @@ export function artifactTitle(code: string, fallback = "Untitled Application"): 
   return title || fallback;
 }
 
+/** Mime types the chat's artifact links can download through the share sheet. */
+const DOWNLOAD_MIME_BY_EXTENSION: Record<string, string> = {
+  pdf: "application/pdf",
+  zip: "application/zip",
+  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  csv: "text/csv",
+  md: "text/markdown",
+  txt: "text/plain",
+  json: "application/json",
+};
+
+export interface DownloadableAsset {
+  url: string;
+  fileName: string;
+  mimeType: string;
+}
+
+/**
+ * Recognise a same-deployment `/api/assets/` link that points at a real file
+ * (generated PDF/ZIP/office document) so the app can download and share it
+ * natively instead of opening the browser.
+ */
+export function classifyDownloadableAsset(
+  resolvedUrl: string,
+): DownloadableAsset | null {
+  try {
+    const parsed = new URL(String(resolvedUrl || ""));
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return null;
+    if (!parsed.pathname.includes("/api/assets/")) return null;
+    const match = /\.([a-z0-9]{2,5})$/i.exec(parsed.pathname);
+    if (!match) return null;
+    const extension = match[1].toLowerCase();
+    const mimeType = DOWNLOAD_MIME_BY_EXTENSION[extension];
+    if (!mimeType) return null;
+    const rawName = parsed.pathname.split("/").pop() || `corez-file.${extension}`;
+    let fileName: string;
+    try {
+      fileName = decodeURIComponent(rawName);
+    } catch {
+      fileName = rawName;
+    }
+    return { url: parsed.toString(), fileName, mimeType };
+  } catch {
+    return null;
+  }
+}
+
 /** Filesystem-safe name for a saved artifact, preferring the document title. */
 export function artifactFileName(
   code: string,

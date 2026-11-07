@@ -54,3 +54,32 @@ export async function copyText(content: string): Promise<boolean> {
     return false;
   }
 }
+
+export interface DownloadableFile {
+  url: string;
+  fileName: string;
+}
+
+/**
+ * Download a generated PDF/ZIP/office artifact into the cache and open the
+ * native share sheet (which includes "Save to Files/Drive"). The URL is the
+ * already-resolved absolute asset URL.
+ */
+export async function downloadAndShareFile({
+  url,
+  fileName,
+}: DownloadableFile): Promise<boolean> {
+  try {
+    if (!(await Sharing.isAvailableAsync())) return false;
+    const target = new File(
+      Paths.cache,
+      `${Date.now()}-${safeFileName(fileName, "corez-download")}`,
+    );
+    if (target.exists) target.delete();
+    const file = await File.downloadFileAsync(url, target);
+    await Sharing.shareAsync(file.uri);
+    return true;
+  } catch {
+    return false;
+  }
+}

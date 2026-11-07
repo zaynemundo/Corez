@@ -23,6 +23,7 @@ the Capacitor shell in `android/` (see [MOBILE.md](./MOBILE.md)) is legacy.
 | Canvas preview: complete HTML artifacts open in a WebView; copy HTML and native share/save from chat | Done |
 | Publishing: publish from the canvas with a public link; Sites screen lists, opens, shares, copies and unpublishes pages | Done |
 | Sites analytics: 7/30/90-day traffic report per published page — totals, daily bars, top pages, source/country/device breakdowns | Done |
+| Downloads: generated PDF/ZIP/office links in answers download to the device and open the native share sheet | Done |
 | Deep links: `corez://` scheme plus Android App Links for `/chat`, `/sites` and `/share/chat`; `/.well-known/assetlinks.json` served by the Worker from `ANDROID_APP_SHA256` | Code + unit tests done; device verification pending |
 | Shared logic extracted to `packages/corez-shared` (intent, skills, i18n, PDF/ZIP byte builders) | Done, web + mobile import the same modules |
 | Mobile sends the same client-side intent classification as the web | Done |
