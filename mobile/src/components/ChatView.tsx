@@ -30,7 +30,7 @@ import {
   appendMessage,
   createChat,
   deriveChatTitle,
-  getChat,
+  getChatWithCache,
 } from "@/api/chats";
 import {
   buildAttachmentPrompt,
@@ -72,6 +72,7 @@ export function ChatView({ initialChatId }: ChatViewProps) {
   const [elapsedMs, setElapsedMs] = useState(0);
   const [loadingChat, setLoadingChat] = useState(Boolean(initialChatId));
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [offlineNotice, setOfflineNotice] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
@@ -133,9 +134,10 @@ export function ChatView({ initialChatId }: ChatViewProps) {
       setLoadError(null);
       setChatId(id);
       try {
-        const detail = await getChat(id);
+        const detail = await getChatWithCache(id);
         if (seq !== loadSeqRef.current) return;
         setChatTitle(detail.title || null);
+        setOfflineNotice(Boolean(detail.offline));
         publishMessages(
           (detail.messages || [])
             .filter((message) => message.role !== "system")
@@ -184,6 +186,7 @@ export function ChatView({ initialChatId }: ChatViewProps) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setChatId(null);
       setChatTitle(null);
+      setOfflineNotice(false);
       publishMessages([]);
       setLoadingChat(false);
       setLoadError(null);
@@ -293,6 +296,7 @@ export function ChatView({ initialChatId }: ChatViewProps) {
         setNotice(friendlyError(caught));
         return;
       }
+      setOfflineNotice(false);
 
       const now = Date.now();
       const userId = `u-${now}`;
@@ -512,6 +516,12 @@ export function ChatView({ initialChatId }: ChatViewProps) {
           style={[styles.notice, { color: colors.negative }]}
         >
           {notice}
+        </Text>
+      ) : null}
+
+      {offlineNotice ? (
+        <Text style={[styles.notice, { color: colors.caution }]}>
+          {t("chat.offline.messages")}
         </Text>
       ) : null}
 

@@ -6,6 +6,7 @@
  * of truth, so switching devices and reinstalling keeps conversations.
  */
 import { requestJson } from "./client";
+import { readCache, removeCache, writeCache } from "@/lib/offlineCache";
 
 export interface ChatSummary {
   id: string;
@@ -37,6 +38,59 @@ export interface ListedChats {
 }
 
 const BASE = "/api/chats";
+const CHATS_CACHE_KEY = "chats";
+const chatCacheKey = (chatId: string) => `chat:${chatId}`;
+
+export interface ChatListResult extends ListedChats {
+  /** True when the network failed and this is the last saved copy. */
+  offline?: boolean;
+  cachedAt?: number;
+}
+
+export interface ChatDetailResult extends ChatDetail {
+  offline?: boolean;
+  cachedAt?: number;
+}
+
+/**
+ * Chat list with an offline fallback: a successful response refreshes the
+ * cache, a transport failure serves the last saved list instead of an empty
+ * sheet. An HTTP error (401, 5xx) is still reported as an error.
+ */
+export async function listChatsWithCache(): Promise<ChatListResult> {
+  try {
+    const live = await listChats();
+    writeCache(CHATS_CACHE_KEY, live.chats);
+    return live;
+  } catch (error) {
+    const cached = readCache<ChatSummary[]>(CHATS_CACHE_KEY);
+    if (cached && Array.isArray(cached.value) && cached.value.length > 0) {
+      return { chats: cached.value, offline: true, cachedAt: cached.updatedAt };
+    }
+    throw error;
+  }
+}
+
+/** One stored conversation with the same offline fallback as the list. */
+export async function getChatWithCache(
+  chatId: string,
+): Promise<ChatDetailResult> {
+  try {
+    const live = await getChat(chatId);
+    writeCache(chatCacheKey(chatId), live);
+    return live;
+  } catch (error) {
+    const cached = readCache<ChatDetail>(chatCacheKey(chatId));
+    if (cached?.value && Array.isArray(cached.value.messages)) {
+      return { ...cached.value, offline: true, cachedAt: cached.updatedAt };
+    }
+    throw error;
+  }
+}
+
+export function forgetCachedChat(chatId: string): void {
+  removeCache(chatCacheKey(chatId));
+}
 
 export async function listChats(): Promise<ListedChats> {
   const data = await requestJson<{ chats?: ChatSummary[] }>(BASE, {

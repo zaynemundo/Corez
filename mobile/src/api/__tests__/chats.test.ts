@@ -3,21 +3,75 @@ import {
   createChat,
   deriveChatTitle,
   getChat,
+  getChatWithCache,
   listChats,
+  listChatsWithCache,
   patchChatTitle,
   setChatPinned,
 } from "../chats";
+import { readCache, writeCache } from "@/lib/offlineCache";
 import { requestJson } from "../client";
 
 jest.mock("../client", () => {
   const actual = jest.requireActual("../client");
   return { ...actual, requestJson: jest.fn() };
 });
+jest.mock("@/lib/offlineCache", () => ({
+  readCache: jest.fn(),
+  writeCache: jest.fn(),
+  removeCache: jest.fn(),
+}));
 
 const requestMock = requestJson as jest.MockedFunction<typeof requestJson>;
+const readCacheMock = readCache as jest.MockedFunction<typeof readCache>;
+const writeCacheMock = writeCache as jest.MockedFunction<typeof writeCache>;
 
 beforeEach(() => {
   requestMock.mockReset();
+  readCacheMock.mockReset();
+  writeCacheMock.mockReset();
+});
+
+describe("offline cache fallbacks", () => {
+  it("caches the live chat list", async () => {
+    requestMock.mockResolvedValueOnce({ chats: [{ id: "c1", title: "One" }] });
+    await expect(listChatsWithCache()).resolves.toEqual({
+      chats: [{ id: "c1", title: "One" }],
+    });
+    expect(writeCacheMock).toHaveBeenCalledWith("chats", [
+      { id: "c1", title: "One" },
+    ]);
+  });
+
+  it("serves the saved list when the network fails", async () => {
+    requestMock.mockRejectedValueOnce(new Error("offline"));
+    readCacheMock.mockReturnValueOnce({
+      value: [{ id: "c1", title: "Saved" }],
+      updatedAt: 123,
+    });
+    await expect(listChatsWithCache()).resolves.toEqual({
+      chats: [{ id: "c1", title: "Saved" }],
+      offline: true,
+      cachedAt: 123,
+    });
+  });
+
+  it("rethrows when the network fails and nothing is cached", async () => {
+    requestMock.mockRejectedValueOnce(new Error("offline"));
+    readCacheMock.mockReturnValueOnce(null);
+    await expect(listChatsWithCache()).rejects.toThrow("offline");
+  });
+
+  it("serves a cached conversation when the network fails", async () => {
+    requestMock.mockRejectedValueOnce(new Error("offline"));
+    readCacheMock.mockReturnValueOnce({
+      value: { id: "c9", title: "Saved chat", messages: [] },
+      updatedAt: 456,
+    });
+    const detail = await getChatWithCache("c9");
+    expect(detail.offline).toBe(true);
+    expect(detail.title).toBe("Saved chat");
+  });
 });
 
 describe("chat persistence API", () => {

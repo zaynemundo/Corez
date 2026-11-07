@@ -92,6 +92,8 @@ const en: Dictionary = {
   "chat.history.deleteTitle": "Delete this chat?",
   "chat.history.deleteBody":
     "The conversation and its messages are removed permanently. Any published page from it is unpublished.",
+  "chat.offline.chats": "Offline — showing saved chats.",
+  "chat.offline.messages": "Offline — showing the saved copy of this chat.",
   "chat.code.plain": "code",
   "chat.code.copy": "Copy",
   "chat.code.copied": "Copied",
@@ -177,6 +179,8 @@ const ar: Dictionary = {
   "chat.history.deleteTitle": "حذف هذه المحادثة؟",
   "chat.history.deleteBody":
     "ستُحذف المحادثة ورسائلها نهائيًا، وستُلغى نشر أي صفحة ناتجة عنها.",
+  "chat.offline.chats": "غير متصل — تُعرض المحادثات المحفوظة.",
+  "chat.offline.messages": "غير متصل — تُعرض نسخة محفوظة من هذه المحادثة.",
   "chat.code.plain": "كود",
   "chat.code.copy": "نسخ",
   "chat.code.copied": "تم النسخ",

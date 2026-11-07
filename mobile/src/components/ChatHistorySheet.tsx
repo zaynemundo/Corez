@@ -19,7 +19,8 @@ import {
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   deleteChat,
-  listChats,
+  forgetCachedChat,
+  listChatsWithCache,
   patchChatTitle,
   setChatPinned,
   type ChatSummary,
@@ -71,7 +72,7 @@ export function ChatHistorySheet({
 
   const chatsQuery = useQuery({
     queryKey: ["chats"],
-    queryFn: listChats,
+    queryFn: listChatsWithCache,
     enabled: visible,
     staleTime: 10_000,
   });
@@ -103,6 +104,7 @@ export function ChatHistorySheet({
   const deleteMutation = useMutation({
     mutationFn: (id: string) => deleteChat(id),
     onSuccess: async (_result, id) => {
+      forgetCachedChat(id);
       setActionMode(null);
       setActionChat(null);
       await refresh();
@@ -225,6 +227,12 @@ export function ChatHistorySheet({
                 </Text>
               </Pressable>
             </View>
+
+            {chatsQuery.data?.offline ? (
+              <Text style={[styles.offlineHint, { color: colors.caution }]}>
+                {t("chat.offline.chats")}
+              </Text>
+            ) : null}
 
             <ScrollView contentContainerStyle={styles.list}>
               {chatsQuery.isLoading ? (
@@ -529,6 +537,11 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   hint: { padding: 14, fontSize: 13.5, textAlign: "center" },
+  offlineHint: {
+    fontSize: 12,
+    paddingHorizontal: 18,
+    paddingBottom: 6,
+  },
   actionBackdrop: {
     flex: 1,
     alignItems: "center",
