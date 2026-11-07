@@ -49,3 +49,7 @@ yarn-error.*
 google-services.json
 keystore.properties
 
+
+# Built APK artifacts copied back from the short-path build
+build-artifacts/
+
