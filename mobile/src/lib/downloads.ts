@@ -83,3 +83,62 @@ export async function downloadAndShareFile({
     return false;
   }
 }
+
+function base64ToBytes(base64: string): Uint8Array {
+  const alphabet =
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+  const clean = base64.replace(/[^A-Za-z0-9+/=]/g, "");
+  const bytes: number[] = [];
+  let buffer = 0;
+  let bits = 0;
+  for (const character of clean) {
+    if (character === "=") break;
+    const value = alphabet.indexOf(character);
+    if (value < 0) continue;
+    buffer = (buffer << 6) | value;
+    bits += 6;
+    if (bits >= 8) {
+      bits -= 8;
+      bytes.push((buffer >> bits) & 0xff);
+    }
+  }
+  return new Uint8Array(bytes);
+}
+
+/**
+ * Share a generated image whether the provider returned an R2 URL or an inline
+ * `data:` URL. Returns false when sharing is unavailable or the payload is
+ * unusable.
+ */
+export async function shareImage(
+  image: string,
+  fileName = "corez-image.png",
+): Promise<boolean> {
+  const value = String(image || "").trim();
+  if (!value) return false;
+  try {
+    if (!(await Sharing.isAvailableAsync())) return false;
+    const target = new File(
+      Paths.cache,
+      `${Date.now()}-${safeFileName(fileName, "corez-image.png")}`,
+    );
+    if (target.exists) target.delete();
+    if (value.startsWith("data:")) {
+      const comma = value.indexOf(",");
+      if (comma < 0) return false;
+      const meta = value.slice(5, comma);
+      if (!/base64/i.test(meta)) return false;
+      const bytes = base64ToBytes(value.slice(comma + 1));
+      if (bytes.length === 0) return false;
+      await target.write(bytes);
+      await Sharing.shareAsync(target.uri);
+      return true;
+    }
+    if (!/^https?:/i.test(value)) return false;
+    const file = await File.downloadFileAsync(value, target);
+    await Sharing.shareAsync(file.uri);
+    return true;
+  } catch {
+    return false;
+  }
+}

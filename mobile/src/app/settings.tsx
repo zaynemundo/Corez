@@ -74,6 +74,24 @@ function SettingsView() {
 
         <Pressable
           accessibilityRole="button"
+          onPress={() => router.push("/image")}
+          style={({ pressed }) => [
+            styles.sitesRow,
+            {
+              backgroundColor: colors.bgSecondary,
+              borderColor: colors.border,
+              opacity: pressed ? 0.75 : 1,
+            },
+          ]}
+        >
+          <Text style={[styles.sitesRowLabel, { color: colors.textPrimary }]}>
+            {t("image.title")}
+          </Text>
+          <Text style={{ color: colors.textMuted, fontSize: 18 }}>›</Text>
+        </Pressable>
+
+        <Pressable
+          accessibilityRole="button"
           onPress={() => router.push("/sites")}
           style={({ pressed }) => [
             styles.sitesRow,

@@ -4,6 +4,7 @@ import {
   copyText,
   downloadAndShareFile,
   safeFileName,
+  shareImage,
   shareTextFile,
 } from "../downloads";
 
@@ -144,5 +145,32 @@ describe("downloadAndShareFile", () => {
       }),
     ).resolves.toBe(false);
     expect(mockDownload).not.toHaveBeenCalled();
+  });
+});
+
+describe("shareImage", () => {
+  it("writes decoded data URLs to the cache before sharing", async () => {
+    const ok = await shareImage("data:image/png;base64,aGVsbG8=", "fox.png");
+    expect(ok).toBe(true);
+    expect(mockWrite).toHaveBeenCalledWith(new Uint8Array([104, 101, 108, 108, 111]));
+    expect(sharingMock.shareAsync).toHaveBeenCalledWith(
+      expect.stringContaining("/cache/"),
+    );
+  });
+
+  it("downloads https images instead of decoding them", async () => {
+    const ok = await shareImage("https://cdn.example/fox.png", "fox.png");
+    expect(ok).toBe(true);
+    expect(mockDownload).toHaveBeenCalledWith(
+      "https://cdn.example/fox.png",
+      expect.objectContaining({ uri: expect.stringContaining("/cache/") }),
+    );
+  });
+
+  it("rejects empty, malformed and unsupported payloads", async () => {
+    await expect(shareImage("")).resolves.toBe(false);
+    await expect(shareImage("data:image/png,raw")).resolves.toBe(false);
+    await expect(shareImage("data:image/png;base64,")).resolves.toBe(false);
+    await expect(shareImage("ftp://example.com/fox.png")).resolves.toBe(false);
   });
 });

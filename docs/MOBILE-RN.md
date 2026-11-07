@@ -26,6 +26,7 @@ the Capacitor shell in `android/` (see [MOBILE.md](./MOBILE.md)) is legacy.
 | Downloads: generated PDF/ZIP/office links in answers download to the device and open the native share sheet | Done |
 | Deep links: `corez://` scheme plus Android App Links for `/chat`, `/sites` and `/share/chat`; `/.well-known/assetlinks.json` served by the Worker from `ANDROID_APP_SHA256` | Done — link verification confirmed on the Android 16 emulator |
 | Shared conversations: share the current chat as a frozen public link and open it in a read-only viewer from `https://corez.pro/share/chat/<token>` | Done (JS + unit tests; emulator verification for the revoked/unavailable path) |
+| Image studio: prompt + style chips, generate through `POST /api/image`, preview/history, save/share the result (R2 URL or inline data URL) | Done (JS-verified; not in the installed APK yet) |
 | Shared logic extracted to `packages/corez-shared` (intent, skills, i18n, PDF/ZIP byte builders) | Done, web + mobile import the same modules |
 | Mobile sends the same client-side intent classification as the web | Done |
 | Android bundle (`expo export --platform android`) | Passes |
@@ -259,7 +260,7 @@ account credentials and a device (or the emulator) to sign in.
 
 ## Known limitations at this stage
 
-- Push notifications and the dedicated image-generation UI are still to come.
+- Push notifications are still to come (Firebase project required).
 - The canvas renders complete HTML documents and canvas games. The web's
   multi-page document splitting and React/JSX compilation pipeline are not
   ported yet, so those artifacts preview as their raw first document.
