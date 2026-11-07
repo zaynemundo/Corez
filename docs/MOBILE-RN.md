@@ -160,11 +160,11 @@ The debug APK was built in this workspace on 2026-11-07 with:
   Android debug certificate** because no release keystore is configured yet.
   It is installable for verification; a distributable release needs the
   keystore below, which flips the signing identity.
-- The latest release build (2026-11-07 23:41, 98.2 MB) embeds the canvas
-  preview, publishing/Sites screen, Sites analytics, native artifact downloads
-  and the shared-conversation viewer. Its `assets/index.android.bundle` was
-  checked for those feature strings, the APK was re-installed and launched on
-  the Android 16 emulator, and it is the file at
+- The latest release build (2026-11-08 00:05, 98.2 MB) embeds the canvas
+  preview, publishing/Sites screen, Sites analytics, native artifact downloads,
+  shared-conversation viewer and the image studio. Its
+  `assets/index.android.bundle` was checked for those feature strings and the
+  APK signature was re-verified; it is the file at
   `mobile/build-artifacts/app-release.apk`.
 
 Install on a USB-connected device with `adb install -r` once `adb devices`
