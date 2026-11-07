@@ -78,3 +78,34 @@ jobs:
 
       - name: Run swarm and harness contract suite
         run: npm run test:swarm
+
+  # The React Native client is a separate project with its own lockfile. It is
+  # gated here so a broken mobile change cannot reach main (or deploy) just
+  # because the web suite is green.
+  verify-mobile:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Run linter
+        run: npm run lint
+
+      - name: Run unit tests
+        run: npm test -- --ci
