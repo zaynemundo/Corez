@@ -11,11 +11,17 @@ function rule(selector) {
 }
 
 describe('sidebar history list caps', () => {
-  it('shows five Recents rows and scrolls the rest', () => {
+  it('shows five Recents rows by default and scrolls the rest', () => {
     const block = rule('.sidebar-chats-list');
     expect(block).toContain('max-height: calc(5 * var(--sidebar-item-min-height)');
     expect(block).toContain('overflow-y: auto');
     expect(block).toContain('scrollbar-width: none');
+  });
+
+  it('shows eight Recents rows on desktop', () => {
+    expect(css).toMatch(
+      /@media \(min-width: 1024px\)\s*\{\s*\.sidebar-chats-list\s*\{[^}]*max-height:\s*calc\(8 \* var\(--sidebar-item-min-height\) \+ 7 \* 0\.2rem\)/,
+    );
   });
 
   it('shows five Messages conversations and scrolls the rest', () => {

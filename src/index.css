@@ -921,14 +921,24 @@ h6 {
   gap: 0.2rem;
 }
 
-/* Recents and Messages show five histories before scrolling. The cap is
-   expressed in row units so it stays true at every UI scale. */
+/* Recents and Messages show five histories before scrolling on smaller
+   screens. Desktop gets eight Recents rows; the cap is expressed in row units
+   so it stays true at every UI scale. */
 .sidebar-chats-list {
   max-height: calc(5 * var(--sidebar-item-min-height) + 4 * 0.2rem);
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-width: none;
   -ms-overflow-style: none;
+}
+
+@media (min-width: 1024px) {
+  .sidebar-chats-list {
+    max-height: calc(8 * var(--sidebar-item-min-height) + 7 * 0.2rem);
+    /* Do not let the flex parent squeeze the list below its eight-row cap;
+       the scrollable history area takes the overflow instead. */
+    flex-shrink: 0;
+  }
 }
 
 /* An open section with nothing in it must not spend a gap: expanding Projects
