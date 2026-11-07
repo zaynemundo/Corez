@@ -18,9 +18,12 @@ describe('sidebar history list caps', () => {
     expect(block).toContain('scrollbar-width: none');
   });
 
-  it('shows eight Recents rows on desktop', () => {
+  it('shows eight Recents rows on very large desktops only', () => {
     expect(css).toMatch(
-      /@media \(min-width: 1024px\)\s*\{\s*\.sidebar-chats-list\s*\{[^}]*max-height:\s*calc\(8 \* var\(--sidebar-item-min-height\) \+ 7 \* 0\.2rem\)/,
+      /@media \(min-width: 2401px\)\s*\{\s*\.sidebar-chats-list\s*\{[^}]*max-height:\s*calc\(8 \* var\(--sidebar-item-min-height\) \+ 7 \* 0\.2rem\)/,
+    );
+    expect(css).not.toMatch(
+      /@media \(min-width: 1024px\)\s*\{\s*\.sidebar-chats-list/,
     );
   });
 

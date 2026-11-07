@@ -921,9 +921,9 @@ h6 {
   gap: 0.2rem;
 }
 
-/* Recents and Messages show five histories before scrolling on smaller
-   screens. Desktop gets eight Recents rows; the cap is expressed in row units
-   so it stays true at every UI scale. */
+/* Recents and Messages show five histories before scrolling on laptops and
+   smaller screens. Very large desktops override only Recents to eight rows.
+   The cap is expressed in row units so it stays true at every UI scale. */
 .sidebar-chats-list {
   max-height: calc(5 * var(--sidebar-item-min-height) + 4 * 0.2rem);
   overflow-y: auto;
@@ -932,7 +932,9 @@ h6 {
   -ms-overflow-style: none;
 }
 
-@media (min-width: 1024px) {
+/* Only very large desktop monitors get the taller Recents list. Laptops and
+   standard monitors keep the original five-row cap. */
+@media (min-width: 2401px) {
   .sidebar-chats-list {
     max-height: calc(8 * var(--sidebar-item-min-height) + 7 * 0.2rem);
     /* Do not let the flex parent squeeze the list below its eight-row cap;
