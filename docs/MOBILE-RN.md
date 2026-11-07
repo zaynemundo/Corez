@@ -25,7 +25,7 @@ the Capacitor shell in `android/` (see [MOBILE.md](./MOBILE.md)) is legacy.
 | Android bundle (`expo export --platform android`) | Passes |
 | `expo prebuild --platform android` | Passes |
 | Debug APK (`assembleDebug`) | **Passes** — `mobile/build-artifacts/app-debug.apk` (debug-signed, 4 ABIs) |
-| Release APK (`assembleRelease` + keystore) | Pending a release keystore (see checklist) |
+| Release build (`assembleRelease` + R8) | **Passes** — `mobile/build-artifacts/app-release.apk` (debug-cert signed for verification; production signing needs your keystore) |
 | On-device spike | **Blocked on a connected adb device** (below) |
 
 The on-device spike is the Phase 0 go/no-go gate: it must prove bearer login,
@@ -139,10 +139,14 @@ The debug APK was built in this workspace on 2026-11-07 with:
 - Result: `BUILD SUCCESSFUL` (520 tasks) → `app-debug.apk`, 236 MB (all four ABIs,
   debug overhead), V2-signed with the Android debug certificate
   (`CN=Android Debug`), package `pro.corez.app`, versionName `0.1.0`.
+- `assembleRelease` also passes (640 tasks, R8/minification):
+  `app-release.apk`, 98 MB, package `pro.corez.app`, **V2-signed with the
+  Android debug certificate** because no release keystore is configured yet.
+  It is installable for verification; a distributable release needs the
+  keystore below, which flips the signing identity.
 
 Install on a USB-connected device with `adb install -r` once `adb devices`
-lists the phone. A release APK additionally needs the keystore below; the
-release variant also enables R8 minification.
+lists the phone.
 
 ## NDK r27 / libc++ link workaround (required)
 
