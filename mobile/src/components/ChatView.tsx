@@ -712,12 +712,6 @@ export function ChatView({ initialChatId }: ChatViewProps) {
           <Feather name="menu" size={20} color={colors.textPrimary} />
         </Pressable>
         <View style={styles.brandWrap}>
-          <Image
-            source={require("../../assets/android-icon-foreground.png")}
-            style={styles.headerMark}
-            resizeMode="contain"
-            accessibilityIgnoresInvertColors
-          />
           <View style={styles.headerText}>
             {chatTitle ? (
               <Text
@@ -976,9 +970,8 @@ const styles = StyleSheet.create({
     minWidth: 0,
     flexDirection: "row",
     alignItems: "center",
-    gap: 9,
+    gap: 0,
   },
-  headerMark: { width: 22, height: 22 },
   headerText: {
     flex: 1,
     minWidth: 0,
