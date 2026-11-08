@@ -18,6 +18,7 @@ import {
   Text,
   View,
   type ScrollViewInstance,
+  type TextInputInstance,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
@@ -86,6 +87,15 @@ export function ChatView({ initialChatId }: ChatViewProps) {
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const startedAtRef = useRef(0);
   const scrollRef = useRef<ScrollViewInstance | null>(null);
+  const composerRef = useRef<TextInputInstance | null>(null);
+  const revisionCodeRef = useRef<string | null>(null);
+
+  const reviseCode = useCallback((code: string) => {
+    revisionCodeRef.current = code;
+    setInput("Revise code: ");
+    setNotice(null);
+    setTimeout(() => composerRef.current?.focus(), 80);
+  }, []);
 
   const shareChat = useCallback(async () => {
     if (sharingChat) return;
@@ -152,6 +162,7 @@ export function ChatView({ initialChatId }: ChatViewProps) {
   const loadStoredChat = useCallback(
     async (id: string) => {
       const seq = ++loadSeqRef.current;
+      revisionCodeRef.current = null;
       setLoadingChat(true);
       setLoadError(null);
       setChatId(id);
@@ -262,7 +273,12 @@ export function ChatView({ initialChatId }: ChatViewProps) {
       const turnAttachments = attachments;
       const prompt =
         trimmed || turnAttachments.map((item) => item.name).join(", ");
-      const apiPrompt = `${prompt}${buildAttachmentPrompt(turnAttachments)}`;
+      let apiPrompt = `${prompt}${buildAttachmentPrompt(turnAttachments)}`;
+      const revisionCode = revisionCodeRef.current;
+      if (revisionCode) {
+        apiPrompt = `${apiPrompt}\n\n[Existing code to revise - apply the requested change directly and output the complete updated file]:\n\`\`\`html\n${revisionCode}\n\`\`\``;
+        revisionCodeRef.current = null;
+      }
       const apiAttachments = toApiAttachments(turnAttachments);
       const displayAttachments = turnAttachments.map(
         ({ id, name, type, size, thumb, assetUrl, assetKey }) => ({
@@ -641,6 +657,7 @@ export function ChatView({ initialChatId }: ChatViewProps) {
               message={message}
               thinkingExpanded={thinkingExpanded}
               onToggleThinking={() => setThinkingExpanded((prev) => !prev)}
+              onReviseCode={reviseCode}
               streamElapsedMs={elapsedMs}
               tokensPerSecond={liveRate}
             />
@@ -650,6 +667,7 @@ export function ChatView({ initialChatId }: ChatViewProps) {
 
       <View style={[styles.composerWrap, { paddingBottom: insets.bottom + 10 }]}>
         <Composer
+          ref={composerRef}
           value={input}
           onChangeText={setInput}
           onSend={() => void send()}

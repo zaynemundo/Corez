@@ -25,12 +25,11 @@ import { useTheme } from "@/state/theme";
 import { useI18n } from "@/i18n";
 import { resolveAssetUrl } from "@/lib/urls";
 import {
-  artifactFileName,
   classifyDownloadableAsset,
   isHtmlLanguage,
   isRenderableHtml,
 } from "@/lib/artifacts";
-import { downloadAndShareFile, shareTextFile } from "@/lib/downloads";
+import { downloadAndShareFile } from "@/lib/downloads";
 import { ImageFullscreenModal } from "./ImageFullscreenModal";
 import { CanvasView } from "./CanvasView";
 
@@ -52,32 +51,41 @@ export const resolveMarkdownUrl = resolveAssetUrl;
 
 const ImagePressContext = createContext<((uri: string) => void) | null>(null);
 const CanvasOpenContext = createContext<((html: string) => void) | null>(null);
+const ReviseCodeContext = createContext<((code: string) => void) | null>(null);
 
 function stripHtml(value: string): string {
   return String(value || "").replace(/<[^>]+>/g, "");
 }
 
-export function MarkdownView({ content }: { content: string }) {
+export function MarkdownView({
+  content,
+  onReviseCode,
+}: {
+  content: string;
+  onReviseCode?: (code: string) => void;
+}) {
   const tokens = useMemo(() => parseMarkdown(content), [content]);
   const [fullscreenUri, setFullscreenUri] = useState<string | null>(null);
   const [canvasHtml, setCanvasHtml] = useState<string | null>(null);
   return (
     <ImagePressContext.Provider value={setFullscreenUri}>
       <CanvasOpenContext.Provider value={setCanvasHtml}>
-        <View style={styles.container}>
-          {tokens.map((token, index) => (
-            <Block key={`${token.type}-${index}`} token={token} />
-          ))}
-        </View>
-        {fullscreenUri ? (
-          <ImageFullscreenModal
-            uri={fullscreenUri}
-            onClose={() => setFullscreenUri(null)}
-          />
-        ) : null}
-        {canvasHtml ? (
-          <CanvasView html={canvasHtml} onClose={() => setCanvasHtml(null)} />
-        ) : null}
+        <ReviseCodeContext.Provider value={onReviseCode ?? null}>
+          <View style={styles.container}>
+            {tokens.map((token, index) => (
+              <Block key={`${token.type}-${index}`} token={token} />
+            ))}
+          </View>
+          {fullscreenUri ? (
+            <ImageFullscreenModal
+              uri={fullscreenUri}
+              onClose={() => setFullscreenUri(null)}
+            />
+          ) : null}
+          {canvasHtml ? (
+            <CanvasView html={canvasHtml} onClose={() => setCanvasHtml(null)} />
+          ) : null}
+        </ReviseCodeContext.Provider>
       </CanvasOpenContext.Provider>
     </ImagePressContext.Provider>
   );
@@ -353,8 +361,8 @@ function CodeBlock({ code, language }: { code: string; language: string }) {
   const { t } = useI18n();
   const colors = theme.colors;
   const openCanvas = useContext(CanvasOpenContext);
+  const reviseCode = useContext(ReviseCodeContext);
   const [copied, setCopied] = useState(false);
-  const [shared, setShared] = useState(false);
   const resetTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const canPreview = isHtmlLanguage(language) || isRenderableHtml(code);
 
@@ -373,20 +381,6 @@ function CodeBlock({ code, language }: { code: string; language: string }) {
       resetTimer.current = setTimeout(() => setCopied(false), 1600);
     } catch {
       // Clipboard failures are non-fatal; the code is still selectable.
-    }
-  };
-
-  const share = async () => {
-    const ok = await shareTextFile({
-      content: code,
-      fileName: artifactFileName(code),
-      mimeType: "text/html",
-      dialogTitle: t("canvas.shareFile"),
-    });
-    if (ok) {
-      setShared(true);
-      if (resetTimer.current) clearTimeout(resetTimer.current);
-      resetTimer.current = setTimeout(() => setShared(false), 1600);
     }
   };
 
@@ -419,15 +413,15 @@ function CodeBlock({ code, language }: { code: string; language: string }) {
               </Text>
             </Pressable>
           ) : null}
-          {canPreview ? (
+          {canPreview && reviseCode ? (
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel={t("canvas.shareFile")}
-              onPress={() => void share()}
+              accessibilityLabel={t("chat.code.revise")}
+              onPress={() => reviseCode(code)}
               hitSlop={8}
             >
-              <Text style={[styles.codeAction, { color: colors.textSecondary }]}>
-                {shared ? t("canvas.shared") : t("canvas.shareFile")}
+              <Text style={[styles.codeAction, { color: colors.textPrimary }]}>
+                {t("chat.code.revise")}
               </Text>
             </Pressable>
           ) : null}

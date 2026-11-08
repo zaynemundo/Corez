@@ -36,6 +36,7 @@ interface MessageBubbleProps {
   message: ChatMessageModel;
   thinkingExpanded: boolean;
   onToggleThinking: () => void;
+  onReviseCode?: (code: string) => void;
   streamElapsedMs?: number;
   tokensPerSecond?: number;
 }
@@ -44,6 +45,7 @@ export function MessageBubble({
   message,
   thinkingExpanded,
   onToggleThinking,
+  onReviseCode,
   streamElapsedMs = 0,
   tokensPerSecond = 0,
 }: MessageBubbleProps) {
@@ -140,7 +142,7 @@ export function MessageBubble({
         />
       ) : null}
       {message.content ? (
-        <MarkdownView content={message.content} />
+        <MarkdownView content={message.content} onReviseCode={onReviseCode} />
       ) : message.streaming ? null : (
         <Text style={[styles.assistantText, { color: colors.textMuted }]}>
           {t("chat.error.empty")}

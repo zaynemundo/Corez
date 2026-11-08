@@ -12,10 +12,13 @@ jest.mock("expo-clipboard", () => ({
 
 // RNTL 14 renders concurrently, so render() must be awaited before screen is
 // available.
-async function renderMarkdown(content: string) {
+async function renderMarkdown(
+  content: string,
+  props: { onReviseCode?: (code: string) => void } = {},
+) {
   await render(
     <ThemeProvider>
-      <MarkdownView content={content} />
+      <MarkdownView content={content} {...props} />
     </ThemeProvider>,
   );
 }
@@ -114,5 +117,24 @@ describe("MarkdownView rendering", () => {
   it("does not offer a canvas preview for a non-HTML snippet", async () => {
     await renderMarkdown("```js\nconst x = 1;\n```");
     expect(screen.queryByText("Preview")).toBeNull();
+  });
+
+  it("offers a Revise action on HTML artifacts and passes the code back", async () => {
+    const onReviseCode = jest.fn();
+    const html =
+      "<!doctype html><html><body><h1>Hello canvas</h1></body></html>";
+    await renderMarkdown("```html\n" + html + "\n```", { onReviseCode });
+
+    expect(screen.queryByText("Preview")).toBeTruthy();
+    expect(screen.queryByText("Revise")).toBeTruthy();
+    await fireEvent.press(screen.getByText("Revise"));
+    expect(onReviseCode).toHaveBeenCalledWith(html);
+  });
+
+  it("does not offer Revise for a non-HTML snippet", async () => {
+    await renderMarkdown("```js\nconst x = 1;\n```", {
+      onReviseCode: jest.fn(),
+    });
+    expect(screen.queryByText("Revise")).toBeNull();
   });
 });
