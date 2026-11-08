@@ -56,7 +56,6 @@ import {
   speakersForPrompt,
   type Persona,
 } from "@/lib/conversation";
-import { useAuth } from "@/state/auth";
 import { useTheme } from "@/state/theme";
 import { useI18n } from "@/i18n";
 import { useDictation } from "@/hooks/useDictation";
@@ -69,7 +68,6 @@ interface ChatViewProps {
 }
 
 export function ChatView({ initialChatId }: ChatViewProps) {
-  const { user } = useAuth();
   const { theme } = useTheme();
   const { t, language } = useI18n();
   const insets = useSafeAreaInsets();
@@ -721,9 +719,6 @@ export function ChatView({ initialChatId }: ChatViewProps) {
             accessibilityIgnoresInvertColors
           />
           <View style={styles.headerText}>
-            <Text style={[styles.brand, { color: colors.textPrimary }]}>
-              COREZ
-            </Text>
             {chatTitle ? (
               <Text
                 numberOfLines={1}
@@ -823,49 +818,36 @@ export function ChatView({ initialChatId }: ChatViewProps) {
             <Text style={[styles.heroTitle, { color: colors.textPrimary }]}>
               {t("newChat.title")}
             </Text>
-            <Text style={[styles.heroSubtitle, { color: colors.textSecondary }]}>
-              {t("newChat.subtitle")}
-            </Text>
-            {user?.email ? (
-              <Text style={[styles.heroUser, { color: colors.textMuted }]}>
-                {user.email}
-              </Text>
-            ) : null}
             <View style={styles.starterGrid}>
               {[
                 {
                   key: "website",
                   icon: "layout" as const,
                   label: t("home.starters.website"),
-                  hint: t("home.starters.websiteHint"),
                   conversation: false,
                 },
                 {
                   key: "game",
                   icon: "zap" as const,
                   label: t("home.starters.game"),
-                  hint: t("home.starters.gameHint"),
                   conversation: false,
                 },
                 {
                   key: "image",
                   icon: "image" as const,
                   label: t("home.starters.image"),
-                  hint: t("home.starters.imageHint"),
                   conversation: false,
                 },
                 {
                   key: "research",
                   icon: "search" as const,
                   label: t("home.starters.research"),
-                  hint: t("home.starters.researchHint"),
                   conversation: false,
                 },
                 {
                   key: "conversation",
                   icon: "users" as const,
                   label: t("home.starters.conversation"),
-                  hint: t("home.starters.conversationHint"),
                   conversation: true,
                 },
               ].map((starter) => (
@@ -905,20 +887,12 @@ export function ChatView({ initialChatId }: ChatViewProps) {
                       color={colors.textPrimary}
                     />
                   </View>
-                  <View style={styles.starterText}>
-                    <Text
-                      numberOfLines={1}
-                      style={[styles.starterLabel, { color: colors.textPrimary }]}
-                    >
-                      {starter.label}
-                    </Text>
-                    <Text
-                      numberOfLines={2}
-                      style={[styles.starterHint, { color: colors.textMuted }]}
-                    >
-                      {starter.hint}
-                    </Text>
-                  </View>
+                  <Text
+                    numberOfLines={2}
+                    style={[styles.starterLabel, { color: colors.textPrimary }]}
+                  >
+                    {starter.label}
+                  </Text>
                 </Pressable>
               ))}
             </View>
@@ -1087,30 +1061,21 @@ const styles = StyleSheet.create({
     letterSpacing: -0.5,
     textAlign: "center",
   },
-  heroSubtitle: {
-    fontSize: 14,
-    lineHeight: 20,
-    textAlign: "center",
-  },
-  heroUser: {
-    fontSize: 12,
-    textAlign: "center",
-    marginTop: 2,
-  },
   starterGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 10,
-    marginTop: 18,
+    marginTop: 22,
   },
   starterCard: {
     flexBasis: "48%",
     flexGrow: 1,
+    alignItems: "flex-start",
     borderWidth: StyleSheet.hairlineWidth,
     borderRadius: 14,
     padding: 12,
-    gap: 9,
-    minHeight: 106,
+    gap: 10,
+    minHeight: 96,
   },
   starterWide: {
     flexBasis: "100%",
@@ -1119,27 +1084,21 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 14,
     padding: 12,
-    gap: 12,
-    minHeight: 68,
+    gap: 10,
+    minHeight: 64,
   },
   starterIcon: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     alignItems: "center",
     justifyContent: "center",
   },
-  starterText: {
-    flexShrink: 1,
-    gap: 3,
-  },
   starterLabel: {
+    flexShrink: 1,
     fontSize: 13.5,
+    lineHeight: 18,
     fontWeight: "600",
-  },
-  starterHint: {
-    fontSize: 11.5,
-    lineHeight: 15,
   },
   composerWrap: {
     paddingHorizontal: 12,
