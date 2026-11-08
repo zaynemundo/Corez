@@ -9,6 +9,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { router } from "expo-router";
 import {
   ActivityIndicator,
+  Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -708,24 +709,34 @@ export function ChatView({ initialChatId }: ChatViewProps) {
           accessibilityLabel={t("chat.history.title")}
           onPress={() => setHistoryOpen(true)}
           hitSlop={12}
-          style={styles.headerButton}
+          style={[styles.headerButton, { backgroundColor: colors.bgTertiary }]}
         >
           <Feather name="menu" size={20} color={colors.textPrimary} />
         </Pressable>
-        <View style={styles.headerText}>
-          <Text style={[styles.brand, { color: colors.textPrimary }]}>COREZ</Text>
-          {chatTitle ? (
-            <Text
-              numberOfLines={1}
-              style={[styles.chatTitle, { color: colors.textSecondary }]}
-            >
-              {chatTitle}
+        <View style={styles.brandWrap}>
+          <Image
+            source={require("../../assets/android-icon-foreground.png")}
+            style={styles.headerMark}
+            resizeMode="contain"
+            accessibilityIgnoresInvertColors
+          />
+          <View style={styles.headerText}>
+            <Text style={[styles.brand, { color: colors.textPrimary }]}>
+              COREZ
             </Text>
-          ) : (
-            <Text style={[styles.previewTag, { color: colors.textMuted }]}>
-              {t("common.chat.mobileTag")}
-            </Text>
-          )}
+            {chatTitle ? (
+              <Text
+                numberOfLines={1}
+                style={[styles.chatTitle, { color: colors.textSecondary }]}
+              >
+                {chatTitle}
+              </Text>
+            ) : (
+              <Text style={[styles.previewTag, { color: colors.textMuted }]}>
+                {t("common.chat.mobileTag")}
+              </Text>
+            )}
+          </View>
         </View>
         <View style={styles.headerActions}>
           <Pressable
@@ -734,7 +745,7 @@ export function ChatView({ initialChatId }: ChatViewProps) {
             onPress={() => void shareChat()}
             disabled={sharingChat}
             hitSlop={12}
-            style={styles.headerButton}
+            style={[styles.headerButton, { backgroundColor: colors.bgTertiary }]}
           >
             {sharingChat ? (
               <ActivityIndicator size="small" color={colors.textSecondary} />
@@ -747,9 +758,10 @@ export function ChatView({ initialChatId }: ChatViewProps) {
             accessibilityLabel={t("shell.settings")}
             onPress={() => router.push("/settings")}
             hitSlop={12}
-            style={styles.headerButton}
+            style={[styles.headerButton, { backgroundColor: colors.bgTertiary }]}
           >
-            <Feather name="settings" size={19} color={colors.textSecondary} />          </Pressable>
+            <Feather name="settings" size={19} color={colors.textSecondary} />
+          </Pressable>
         </View>
       </View>
 
@@ -802,47 +814,111 @@ export function ChatView({ initialChatId }: ChatViewProps) {
           </View>
         ) : isEmpty ? (
           <View style={styles.hero}>
+            <Image
+              source={require("../../assets/android-icon-foreground.png")}
+              style={styles.heroMark}
+              resizeMode="contain"
+              accessibilityIgnoresInvertColors
+            />
             <Text style={[styles.heroTitle, { color: colors.textPrimary }]}>
               {t("newChat.title")}
             </Text>
-            <Text style={[styles.heroUser, { color: colors.textMuted }]}>
-              {user?.email}
+            <Text style={[styles.heroSubtitle, { color: colors.textSecondary }]}>
+              {t("newChat.subtitle")}
             </Text>
-            <View style={styles.starters}>
+            {user?.email ? (
+              <Text style={[styles.heroUser, { color: colors.textMuted }]}>
+                {user.email}
+              </Text>
+            ) : null}
+            <View style={styles.starterGrid}>
               {[
-                { label: t("home.starters.website"), conversation: false },
-                { label: t("home.starters.game"), conversation: false },
-                { label: t("home.starters.image"), conversation: false },
-                { label: t("home.starters.research"), conversation: false },
-                { label: t("home.starters.conversation"), conversation: true },
-              ].map(({ label, conversation: isConversationStarter }) => (
+                {
+                  key: "website",
+                  icon: "layout" as const,
+                  label: t("home.starters.website"),
+                  hint: t("home.starters.websiteHint"),
+                  conversation: false,
+                },
+                {
+                  key: "game",
+                  icon: "zap" as const,
+                  label: t("home.starters.game"),
+                  hint: t("home.starters.gameHint"),
+                  conversation: false,
+                },
+                {
+                  key: "image",
+                  icon: "image" as const,
+                  label: t("home.starters.image"),
+                  hint: t("home.starters.imageHint"),
+                  conversation: false,
+                },
+                {
+                  key: "research",
+                  icon: "search" as const,
+                  label: t("home.starters.research"),
+                  hint: t("home.starters.researchHint"),
+                  conversation: false,
+                },
+                {
+                  key: "conversation",
+                  icon: "users" as const,
+                  label: t("home.starters.conversation"),
+                  hint: t("home.starters.conversationHint"),
+                  conversation: true,
+                },
+              ].map((starter) => (
                 <Pressable
-                  key={label}
+                  key={starter.key}
                   accessibilityRole="button"
+                  accessibilityLabel={starter.label}
                   onPress={() => {
-                    if (isConversationStarter) {
+                    if (starter.conversation) {
                       router.push("/conversation/new");
                       return;
                     }
-                    setInput(`${label}: `);
+                    setInput(`${starter.label}: `);
                   }}
                   style={({ pressed }) => [
-                    styles.starter,
+                    starter.conversation ? styles.starterWide : styles.starterCard,
                     {
-                      borderColor: colors.border,
-                      backgroundColor: colors.bgCard,
+                      borderColor: starter.conversation
+                        ? colors.borderHover
+                        : colors.border,
+                      backgroundColor: starter.conversation
+                        ? colors.bgTertiary
+                        : colors.bgCard,
                       opacity: pressed ? 0.8 : 1,
                     },
                   ]}
                 >
-                  <Text
+                  <View
                     style={[
-                      styles.starterLabel,
-                      { color: colors.textSecondary },
+                      styles.starterIcon,
+                      { backgroundColor: colors.bgTertiary },
                     ]}
                   >
-                    {label}
-                  </Text>
+                    <Feather
+                      name={starter.icon}
+                      size={17}
+                      color={colors.textPrimary}
+                    />
+                  </View>
+                  <View style={styles.starterText}>
+                    <Text
+                      numberOfLines={1}
+                      style={[styles.starterLabel, { color: colors.textPrimary }]}
+                    >
+                      {starter.label}
+                    </Text>
+                    <Text
+                      numberOfLines={2}
+                      style={[styles.starterHint, { color: colors.textMuted }]}
+                    >
+                      {starter.hint}
+                    </Text>
+                  </View>
                 </Pressable>
               ))}
             </View>
@@ -917,35 +993,48 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 10,
-    paddingBottom: 10,
+    paddingHorizontal: 12,
+    paddingBottom: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
+  brandWrap: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 9,
+  },
+  headerMark: { width: 22, height: 22 },
   headerText: {
     flex: 1,
     minWidth: 0,
     flexDirection: "row",
     alignItems: "baseline",
-    gap: 10,
+    gap: 8,
   },
   chatTitle: {
     flexShrink: 1,
     fontSize: 13,
   },
   headerButton: {
-    minWidth: 44,
-    minHeight: 44,
+    width: 38,
+    height: 38,
+    minWidth: 38,
+    minHeight: 38,
+    borderRadius: 19,
     alignItems: "center",
     justifyContent: "center",
   },
   headerActions: {
     flexDirection: "row",
     alignItems: "center",
+    gap: 7,
+    marginLeft: 8,
   },
   brand: {
     fontFamily: "Outfit_700Bold",
-    fontSize: 16,
-    letterSpacing: 3.5,
+    fontSize: 15,
+    letterSpacing: 3.2,
   },
   previewTag: {
     fontSize: 10.5,
@@ -982,30 +1071,75 @@ const styles = StyleSheet.create({
   hero: {
     flex: 1,
     justifyContent: "center",
-    paddingHorizontal: 22,
-    gap: 10,
+    paddingHorizontal: 18,
+    gap: 8,
+  },
+  heroMark: {
+    width: 54,
+    height: 54,
+    alignSelf: "center",
+    marginBottom: 12,
   },
   heroTitle: {
     fontFamily: "Outfit_600SemiBold",
-    fontSize: 26,
-    lineHeight: 34,
-    letterSpacing: -0.4,
+    fontSize: 28,
+    lineHeight: 35,
+    letterSpacing: -0.5,
+    textAlign: "center",
+  },
+  heroSubtitle: {
+    fontSize: 14,
+    lineHeight: 20,
+    textAlign: "center",
   },
   heroUser: {
-    fontSize: 13,
+    fontSize: 12,
+    textAlign: "center",
+    marginTop: 2,
   },
-  starters: {
-    marginTop: 14,
-    gap: 8,
+  starterGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+    marginTop: 18,
   },
-  starter: {
+  starterCard: {
+    flexBasis: "48%",
+    flexGrow: 1,
     borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
+    borderRadius: 14,
+    padding: 12,
+    gap: 9,
+    minHeight: 106,
+  },
+  starterWide: {
+    flexBasis: "100%",
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1,
+    borderRadius: 14,
+    padding: 12,
+    gap: 12,
+    minHeight: 68,
+  },
+  starterIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  starterText: {
+    flexShrink: 1,
+    gap: 3,
   },
   starterLabel: {
     fontSize: 13.5,
+    fontWeight: "600",
+  },
+  starterHint: {
+    fontSize: 11.5,
+    lineHeight: 15,
   },
   composerWrap: {
     paddingHorizontal: 12,

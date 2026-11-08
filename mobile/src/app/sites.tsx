@@ -247,13 +247,26 @@ function SitesView() {
                 { backgroundColor: colors.bgCard, borderColor: colors.border },
               ]}
             >
+              <View style={styles.cardHeader}>
+                <Text
+                  numberOfLines={2}
+                  style={[styles.cardTitle, { color: colors.textPrimary }]}
+                >
+                  {page.title || page.slug}
+                </Text>
+                <View style={styles.liveBadge}>
+                  <View
+                    style={[styles.liveDot, { backgroundColor: colors.positive }]}
+                  />
+                  <Text style={[styles.liveText, { color: colors.textMuted }]}>
+                    {t("sites.live")}
+                  </Text>
+                </View>
+              </View>
               <Text
-                numberOfLines={2}
-                style={[styles.cardTitle, { color: colors.textPrimary }]}
+                numberOfLines={1}
+                style={[styles.cardUrl, { color: colors.textMuted }]}
               >
-                {page.title || page.slug}
-              </Text>
-              <Text numberOfLines={1} style={[styles.cardUrl, { color: colors.textMuted }]}>
                 {page.url}
               </Text>
               <View style={styles.cardActions}>
@@ -261,9 +274,21 @@ function SitesView() {
                   accessibilityRole="button"
                   accessibilityLabel={`${t("sites.open")} ${page.title || page.slug}`}
                   onPress={() => void Linking.openURL(page.url).catch(() => {})}
-                  style={[styles.action, { borderColor: colors.borderHover }]}
+                  style={[
+                    styles.action,
+                    styles.actionPrimary,
+                    {
+                      borderColor: colors.actionStrong,
+                      backgroundColor: colors.actionStrong,
+                    },
+                  ]}
                 >
-                  <Text style={[styles.actionLabel, { color: colors.textPrimary }]}>
+                  <Text
+                    style={[
+                      styles.actionLabel,
+                      { color: colors.actionStrongContrast },
+                    ]}
+                  >
                     {t("sites.open")}
                   </Text>
                 </Pressable>
@@ -455,13 +480,38 @@ const styles = StyleSheet.create({
   },
   card: {
     borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: 12,
-    padding: 14,
-    gap: 8,
+    borderRadius: 16,
+    padding: 16,
+    gap: 10,
   },
-  cardTitle: { fontFamily: "Outfit_600SemiBold", fontSize: 16 },
-  cardUrl: { fontSize: 12 },
-  cardActions: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 4 },
+  cardHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: 10,
+  },
+  cardTitle: {
+    flex: 1,
+    fontFamily: "Outfit_600SemiBold",
+    fontSize: 16.5,
+    lineHeight: 22,
+  },
+  liveBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingTop: 3,
+  },
+  liveDot: { width: 7, height: 7, borderRadius: 3.5 },
+  liveText: {
+    fontSize: 10,
+    fontWeight: "700",
+    letterSpacing: 0.7,
+    textTransform: "uppercase",
+  },
+  cardUrl: { fontSize: 12, fontFamily: "JetBrainsMono_400Regular" },
+  cardActions: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 6 },
+  actionPrimary: { minHeight: 38, paddingHorizontal: 18 },
   action: {
     minHeight: 36,
     paddingHorizontal: 12,

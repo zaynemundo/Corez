@@ -14,6 +14,7 @@ the Capacitor shell in `android/` (see [MOBILE.md](./MOBILE.md)) is legacy.
 | API client, SSE parser (`delta`/`thinking`/`phase`/`done`/`error`), turn transport | Done, unit-tested |
 | Login, sign-up, session gate, chat preview, settings | Done |
 | Auth screens mirror the web card: blurred Mercury backdrop, COREZ mark + wordmark, Login/Sign Up tabs, uppercase fields with eye-toggle passwords, Forgot password request (`POST /api/auth/forgot`, reset link goes to the web reset flow), policy note/links and the whole footer line switches modes | Done |
+| UI refresh: brand mark + circular header actions, quick-action grid with icons/hints on the home hero, CoreZ mark on assistant messages, larger composer, profile card and icon rows in Settings, Live badges + primary Open on Sites, chat glyphs in history, and a cleaner Image studio (prompt/style labels, empty state) | Done |
 | Chat persistence: create/list/load conversations, append user + assistant messages, history sheet | Done |
 | Markdown rendering: headings, lists, tables, fenced code with copy, links, inline images | Done |
 | Attachments: camera/gallery/files, R2 upload, vision-shaped API attachments, user-bubble previews | Done |

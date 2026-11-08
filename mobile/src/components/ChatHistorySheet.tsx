@@ -155,6 +155,16 @@ export function ChatHistorySheet({
           onLongPress={() => openMenu(chat)}
           style={styles.rowMain}
         >
+          <View
+            style={[
+              styles.rowIcon,
+              {
+                backgroundColor: active ? colors.bgSecondary : colors.bgTertiary,
+              },
+            ]}
+          >
+            <Feather name="message-square" size={15} color={colors.textSecondary} />
+          </View>
           <Text
             numberOfLines={1}
             style={[styles.rowTitle, { color: colors.textPrimary }]}
@@ -517,17 +527,24 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: "row",
     alignItems: "center",
-    borderRadius: 10,
-    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderRadius: 12,
+    marginBottom: 2,
   },
   rowMain: {
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    gap: 12,
-    minHeight: 48,
-    paddingLeft: 10,
+    gap: 10,
+    minHeight: 54,
+    paddingLeft: 8,
+    paddingRight: 4,
+  },
+  rowIcon: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: "center",
+    justifyContent: "center",
   },
   rowTitle: { flex: 1, fontSize: 14.5 },
   rowTime: { fontSize: 11.5 },

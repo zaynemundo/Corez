@@ -98,7 +98,7 @@ function ImageStudio() {
             router.canGoBack() ? router.back() : router.replace("/chat")
           }
           hitSlop={12}
-          style={styles.headerButton}
+          style={[styles.headerButton, { backgroundColor: colors.bgTertiary }]}
         >
           <Feather name="chevron-left" size={22} color={colors.textPrimary} />
         </Pressable>
@@ -113,6 +113,9 @@ function ImageStudio() {
           {t("image.subtitle")}
         </Text>
 
+        <Text style={[styles.fieldLabel, { color: colors.textMuted }]}>
+          {t("image.promptLabel")}
+        </Text>
         <TextInput
           value={prompt}
           onChangeText={setPrompt}
@@ -132,6 +135,9 @@ function ImageStudio() {
           ]}
         />
 
+        <Text style={[styles.fieldLabel, { color: colors.textMuted }]}>
+          {t("image.styleLabel")}
+        </Text>
         <View style={styles.styleRow}>
           {IMAGE_STYLES.map((style) => {
             const active = style.id === styleId;
@@ -208,6 +214,24 @@ function ImageStudio() {
           </Text>
         ) : null}
 
+        {!result && !busy ? (
+          <View
+            style={[
+              styles.emptyCard,
+              { borderColor: colors.border, backgroundColor: colors.bgCard },
+            ]}
+          >
+            <View
+              style={[styles.emptyIcon, { backgroundColor: colors.bgTertiary }]}
+            >
+              <Feather name="image" size={22} color={colors.textSecondary} />
+            </View>
+            <Text style={[styles.emptyText, { color: colors.textMuted }]}>
+              {t("image.emptyHint")}
+            </Text>
+          </View>
+        ) : null}
+
         {result ? (
           <View style={[styles.resultCard, { borderColor: colors.border, backgroundColor: colors.bgCard }]}>
             <Image
@@ -272,8 +296,11 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   headerButton: {
-    minWidth: 44,
-    minHeight: 44,
+    width: 38,
+    height: 38,
+    minWidth: 38,
+    minHeight: 38,
+    borderRadius: 19,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -285,37 +312,62 @@ const styles = StyleSheet.create({
   },
   content: { padding: 16, gap: 12, paddingBottom: 40 },
   hint: { fontSize: 12.5, lineHeight: 18 },
+  fieldLabel: {
+    fontSize: 11,
+    fontWeight: "700",
+    letterSpacing: 0.9,
+    textTransform: "uppercase",
+    marginBottom: -4,
+  },
   input: {
-    minHeight: 110,
+    minHeight: 128,
     borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 14,
-    lineHeight: 20,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 15,
+    lineHeight: 22,
   },
   styleRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   chip: {
     borderWidth: 1,
     borderRadius: 9999,
-    paddingHorizontal: 14,
-    minHeight: 34,
+    paddingHorizontal: 16,
+    minHeight: 38,
+    alignItems: "center",
     justifyContent: "center",
   },
-  chipLabel: { fontSize: 12, fontWeight: "600" },
+  chipLabel: { fontSize: 12.5, fontWeight: "600" },
+  emptyCard: {
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 16,
+    minHeight: 160,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    padding: 18,
+  },
+  emptyIcon: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  emptyText: { fontSize: 13, textAlign: "center", lineHeight: 19 },
   actions: { flexDirection: "row", alignItems: "center", gap: 10 },
   generate: {
     flex: 1,
-    minHeight: 46,
-    borderRadius: 9999,
+    minHeight: 50,
+    borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
   },
   secondary: {
-    minHeight: 46,
+    minHeight: 50,
     paddingHorizontal: 16,
     borderWidth: 1,
-    borderRadius: 9999,
+    borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
   },

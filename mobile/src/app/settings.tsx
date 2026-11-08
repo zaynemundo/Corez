@@ -126,14 +126,35 @@ function SettingsView() {
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
-        <Section title="Account">
-          <Text style={[styles.value, { color: colors.textPrimary }]}>
-            {user?.email || "—"}
-          </Text>
-          <Text style={[styles.hint, { color: colors.textMuted }]}>
-            {user?.plan ? `Plan: ${user.plan}` : ""}
-          </Text>
-        </Section>
+        <View
+          style={[
+            styles.profileCard,
+            { backgroundColor: colors.bgCard, borderColor: colors.border },
+          ]}
+        >
+          <View
+            style={[styles.profileAvatar, { backgroundColor: colors.bgTertiary }]}
+          >
+            <Text style={[styles.profileInitial, { color: colors.textPrimary }]}>
+              {(user?.email || "C").charAt(0).toUpperCase()}
+            </Text>
+          </View>
+          <View style={styles.profileText}>
+            <Text
+              numberOfLines={1}
+              style={[styles.profileEmail, { color: colors.textPrimary }]}
+            >
+              {user?.email || "—"}
+            </Text>
+            {user?.plan ? (
+              <View style={[styles.planPill, { backgroundColor: colors.bgTertiary }]}>
+                <Text style={[styles.planPillText, { color: colors.textSecondary }]}>
+                  {user.plan.toUpperCase()}
+                </Text>
+              </View>
+            ) : null}
+          </View>
+        </View>
 
         <Pressable
           accessibilityRole="button"
@@ -147,6 +168,9 @@ function SettingsView() {
             },
           ]}
         >
+          <View style={[styles.rowIcon, { backgroundColor: colors.bgTertiary }]}>
+            <Feather name="image" size={17} color={colors.textPrimary} />
+          </View>
           <Text style={[styles.sitesRowLabel, { color: colors.textPrimary }]}>
             {t("image.title")}
           </Text>
@@ -165,6 +189,9 @@ function SettingsView() {
             },
           ]}
         >
+          <View style={[styles.rowIcon, { backgroundColor: colors.bgTertiary }]}>
+            <Feather name="globe" size={17} color={colors.textPrimary} />
+          </View>
           <Text style={[styles.sitesRowLabel, { color: colors.textPrimary }]}>
             {t("sites.title")}
           </Text>
@@ -348,6 +375,7 @@ function SettingsView() {
             },
           ]}
         >
+          <Feather name="log-out" size={16} color={colors.negative} />
           <Text style={[styles.signOutLabel, { color: colors.negative }]}>
             {t("settings.signOut")}
           </Text>
@@ -413,13 +441,45 @@ const styles = StyleSheet.create({
   sitesRow: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
     borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: 10,
+    borderRadius: 14,
+    minHeight: 58,
     paddingHorizontal: 14,
-    minHeight: 50,
+    gap: 12,
   },
-  sitesRowLabel: { fontSize: 14.5, fontWeight: "600" },
+  sitesRowLabel: { flex: 1, fontSize: 14.5, fontWeight: "600" },
+  rowIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  profileCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 16,
+    padding: 14,
+  },
+  profileAvatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  profileInitial: { fontSize: 18, fontWeight: "700" },
+  profileText: { flex: 1, gap: 6, minWidth: 0 },
+  profileEmail: { fontSize: 14.5, fontWeight: "600" },
+  planPill: {
+    alignSelf: "flex-start",
+    borderRadius: 9999,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  planPillText: { fontSize: 10, fontWeight: "700", letterSpacing: 0.8 },
   options: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -470,9 +530,11 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   signOut: {
+    flexDirection: "row",
+    gap: 8,
     borderWidth: 1,
-    borderRadius: 8,
-    minHeight: 48,
+    borderRadius: 12,
+    minHeight: 50,
     alignItems: "center",
     justifyContent: "center",
     marginTop: 6,

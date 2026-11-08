@@ -141,6 +141,14 @@ export function MessageBubble({
 
   return (
     <View style={styles.assistantRow}>
+      {!message.speakerName ? (
+        <Image
+          source={require("../../assets/android-icon-foreground.png")}
+          style={styles.assistantMark}
+          resizeMode="contain"
+          accessibilityIgnoresInvertColors
+        />
+      ) : null}
       {message.speakerName ? (
         <View style={styles.speakerRow}>
           <View
@@ -199,11 +207,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   userBubble: {
-    maxWidth: "92%",
+    maxWidth: "88%",
     borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: 16,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+    borderRadius: 18,
+    paddingHorizontal: 16,
+    paddingVertical: 11,
   },
   userText: {
     fontSize: 15,
@@ -233,8 +241,13 @@ const styles = StyleSheet.create({
   },
   attachmentFileName: { fontSize: 12, flexShrink: 1 },
   assistantRow: {
-    marginBottom: 22,
+    marginBottom: 24,
     paddingHorizontal: 16,
+  },
+  assistantMark: {
+    width: 22,
+    height: 22,
+    marginBottom: 8,
   },
   speakerRow: {
     flexDirection: "row",
