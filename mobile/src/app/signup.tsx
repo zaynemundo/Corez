@@ -4,6 +4,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import * as WebBrowser from "expo-web-browser";
 import { AuthScaffold } from "@/components/AuthScaffold";
 import { AuthField } from "@/components/AuthField";
+import { AuthTabs } from "@/components/AuthTabs";
 import { PrimaryButton } from "@/components/PrimaryButton";
 import { useAuth } from "@/state/auth";
 import { useTheme } from "@/state/theme";
@@ -25,15 +26,11 @@ export default function SignupScreen() {
 
   const submit = async () => {
     if (!email.trim() || !password) {
-      setError("Enter your email and password.");
-      return;
-    }
-    if (password.length < 8) {
-      setError("Password must be at least 8 characters.");
+      setError(t("auth.errors.emailAndPassword"));
       return;
     }
     if (password !== confirm) {
-      setError("Passwords do not match.");
+      setError(t("auth.signup.passwordMismatch"));
       return;
     }
     if (!consent) {
@@ -42,24 +39,35 @@ export default function SignupScreen() {
     }
     setError(null);
     try {
-      await signUp(email, password, {
-        termsVersion: "native-2026-11",
+      await signUp(email.trim(), password, {
+        termsVersion: "2026-01",
         acceptedAt: Date.now(),
-        marketingConsent: false,
       });
     } catch (caught) {
       setError(friendlyError(caught));
     }
   };
 
+  const openLegal = (path: string) => {
+    void WebBrowser.openBrowserAsync(`${API_BASE_URL}${path}`).catch(() => {});
+  };
+
   return (
     <AuthScaffold
-      title={t("auth.signup.subtitle")}
+      subtitle={t("auth.signup.subtitle")}
+      tabs={
+        <AuthTabs
+          active="signup"
+          onLogin={() => router.replace("/login")}
+          onSignup={() => {}}
+        />
+      }
+      legalNote={t("auth.signup.legalNote")}
       footer={
         <Pressable
           accessibilityRole="link"
           accessibilityLabel={`${t("auth.signup.alreadyHaveAccount")} ${t("auth.common.login")}`}
-          onPress={() => router.push("/login")}
+          onPress={() => router.replace("/login")}
           style={styles.footerRow}
         >
           <Text style={{ color: theme.colors.textSecondary, fontSize: 13.5 }}>
@@ -90,7 +98,7 @@ export default function SignupScreen() {
         textContentType="newPassword"
       />
       <AuthField
-        label="Confirm password"
+        label={t("auth.common.confirmPasswordLabel")}
         value={confirm}
         onChangeText={setConfirm}
         placeholder={t("auth.common.passwordPlaceholder")}
@@ -102,6 +110,7 @@ export default function SignupScreen() {
       <Pressable
         accessibilityRole="checkbox"
         accessibilityState={{ checked: consent }}
+        accessibilityLabel={t("auth.signup.consentError")}
         onPress={() => setConsent((prev) => !prev)}
         style={styles.consentRow}
         hitSlop={6}
@@ -124,26 +133,26 @@ export default function SignupScreen() {
                 { color: theme.colors.actionStrongContrast },
               ]}
             >
-              ✓
+              âœ“
             </Text>
           ) : null}
         </View>
         <Text style={[styles.consentText, { color: theme.colors.textSecondary }]}>
-          I am 16 or older and I accept the{" "}
+          {t("auth.signup.consentIntro")}
           <Text
             style={[styles.link, { color: theme.colors.textPrimary }]}
-            onPress={() => void WebBrowser.openBrowserAsync(`${API_BASE_URL}/terms`)}
+            onPress={() => openLegal("/terms")}
           >
-            Terms and Conditions
-          </Text>{" "}
-          and the{" "}
-          <Text
-            style={[styles.link, { color: theme.colors.textPrimary }]}
-            onPress={() => void WebBrowser.openBrowserAsync(`${API_BASE_URL}/privacy`)}
-          >
-            Privacy Policy
+            {t("auth.signup.consentTerms")}
           </Text>
-          .
+          {t("auth.signup.consentAnd")}
+          <Text
+            style={[styles.link, { color: theme.colors.textPrimary }]}
+            onPress={() => openLegal("/privacy")}
+          >
+            {t("auth.signup.consentPrivacy")}
+          </Text>
+          {t("auth.signup.consentEnd")}
         </Text>
       </Pressable>
       {error ? (
@@ -171,37 +180,25 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
   },
   link: {
-    fontSize: 13.5,
+    fontSize: 13,
     fontWeight: "600",
     textDecorationLine: "underline",
-  },
-  error: {
-    fontSize: 13,
-    lineHeight: 19,
   },
   consentRow: {
     flexDirection: "row",
     alignItems: "flex-start",
     gap: 10,
-    paddingVertical: 2,
   },
   checkbox: {
     width: 20,
     height: 20,
-    borderRadius: 5,
+    borderRadius: 4,
     borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",
     marginTop: 1,
   },
-  checkmark: {
-    fontSize: 13,
-    lineHeight: 16,
-    fontWeight: "700",
-  },
-  consentText: {
-    flex: 1,
-    fontSize: 12.5,
-    lineHeight: 19,
-  },
+  checkmark: { fontSize: 12, fontWeight: "700" },
+  consentText: { flex: 1, fontSize: 12, lineHeight: 18 },
+  error: { fontSize: 13, lineHeight: 19 },
 });

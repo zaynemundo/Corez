@@ -94,6 +94,22 @@ export async function fetchMe(): Promise<AuthUser> {
   return data.user;
 }
 
+/** Request a reset link; the server answers identically for unknown emails. */
+export async function forgotPassword(email: string): Promise<{
+  message: string;
+}> {
+  const data = await requestJson<{ ok?: boolean; message?: string }>(
+    "/api/auth/forgot",
+    {
+      method: "POST",
+      body: { email: email.trim().toLowerCase() },
+      nativeClient: true,
+      suppressUnauthorizedEvent: true,
+    },
+  );
+  return { message: data.message || "" };
+}
+
 /**
  * Best-effort cookie clearing for the web deployment. The native session is a
  * bearer token with no server-side store, so "logout" here means dropping the

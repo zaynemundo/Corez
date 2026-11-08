@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { Redirect, router } from "expo-router";
-import { Pressable, StyleSheet, Text } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import { AuthScaffold } from "@/components/AuthScaffold";
 import { AuthField } from "@/components/AuthField";
+import { AuthTabs } from "@/components/AuthTabs";
 import { PrimaryButton } from "@/components/PrimaryButton";
 import { useAuth } from "@/state/auth";
 import { useTheme } from "@/state/theme";
@@ -21,7 +22,7 @@ export default function LoginScreen() {
 
   const submit = async () => {
     if (!email.trim() || !password) {
-      setError("Enter your email and password.");
+      setError(t("auth.errors.emailAndPassword"));
       return;
     }
     setError(null);
@@ -34,7 +35,15 @@ export default function LoginScreen() {
 
   return (
     <AuthScaffold
-      title={t("auth.login.subtitle")}
+      subtitle={t("auth.login.subtitle")}
+      tabs={
+        <AuthTabs
+          active="login"
+          onLogin={() => {}}
+          onSignup={() => router.push("/signup")}
+        />
+      }
+      legalNote={t("auth.login.legalNote")}
       footer={
         <Pressable
           accessibilityRole="link"
@@ -72,6 +81,18 @@ export default function LoginScreen() {
         returnKeyType="go"
         onSubmitEditing={() => void submit()}
       />
+      <View style={styles.forgotRow}>
+        <Pressable
+          accessibilityRole="link"
+          accessibilityLabel={t("auth.login.forgotPassword")}
+          onPress={() => router.push("/forgot")}
+          hitSlop={8}
+        >
+          <Text style={[styles.forgot, { color: theme.colors.textSecondary }]}>
+            {t("auth.login.forgotPassword")}
+          </Text>
+        </Pressable>
+      </View>
       {error ? (
         <Text
           style={[styles.error, { color: theme.colors.negative }]}
@@ -97,8 +118,13 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
   },
   link: {
-    fontSize: 13.5,
+    fontSize: 13,
     fontWeight: "600",
+    textDecorationLine: "underline",
+  },
+  forgotRow: { alignItems: "flex-end", marginTop: -4 },
+  forgot: {
+    fontSize: 12,
     textDecorationLine: "underline",
   },
   error: {

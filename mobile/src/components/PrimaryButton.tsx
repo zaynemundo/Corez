@@ -59,15 +59,15 @@ export function PrimaryButton({
 
 const styles = StyleSheet.create({
   button: {
-    minHeight: 46,
-    borderRadius: 8,
+    minHeight: 50,
+    borderRadius: 10,
     borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 18,
   },
   label: {
-    fontSize: 14.5,
+    fontSize: 15.5,
     fontWeight: "600",
   },
 });

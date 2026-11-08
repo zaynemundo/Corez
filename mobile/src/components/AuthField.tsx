@@ -1,5 +1,6 @@
 /**
- * Themed form field with an optional password visibility toggle.
+ * Themed form field matching the web auth card: uppercase label, bordered
+ * surface input and an eye toggle for passwords.
  */
 import { useState } from "react";
 import {
@@ -10,6 +11,7 @@ import {
   View,
   type TextInputProps,
 } from "react-native";
+import { Feather } from "@expo/vector-icons";
 import { useTheme } from "@/state/theme";
 import { useI18n } from "@/i18n";
 
@@ -40,7 +42,7 @@ export function AuthField({
         style={[
           styles.inputRow,
           {
-            backgroundColor: colors.bgSecondary,
+            backgroundColor: colors.bgTertiary,
             borderColor: focused ? colors.borderHover : colors.border,
           },
         ]}
@@ -74,9 +76,11 @@ export function AuthField({
             hitSlop={10}
             style={styles.toggle}
           >
-            <Text style={[styles.toggleText, { color: colors.textSecondary }]}>
-              {hidden ? t("auth.common.showPassword") : t("auth.common.hidePassword")}
-            </Text>
+            <Feather
+              name={hidden ? "eye" : "eye-off"}
+              size={17}
+              color={colors.textSecondary}
+            />
           </Pressable>
         ) : null}
       </View>
@@ -90,27 +94,31 @@ export function AuthField({
 }
 
 const styles = StyleSheet.create({
-  wrapper: { gap: 6 },
-  label: { fontSize: 12.5, fontWeight: "500" },
+  wrapper: { gap: 7 },
+  label: {
+    fontSize: 11.5,
+    fontWeight: "700",
+    letterSpacing: 0.9,
+    textTransform: "uppercase",
+  },
   inputRow: {
     flexDirection: "row",
     alignItems: "center",
-    borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: 8,
-    minHeight: 46,
-    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderRadius: 10,
+    minHeight: 50,
+    paddingHorizontal: 14,
   },
   input: {
     flex: 1,
-    fontSize: 15,
-    paddingVertical: 10,
+    fontSize: 16,
+    paddingVertical: 12,
+    paddingRight: 6,
   },
   toggle: {
     paddingLeft: 8,
-  },
-  toggleText: {
-    fontSize: 11.5,
-    textDecorationLine: "underline",
+    minHeight: 32,
+    justifyContent: "center",
   },
   error: { fontSize: 12.5 },
 });
