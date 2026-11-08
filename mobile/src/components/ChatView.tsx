@@ -738,15 +738,7 @@ export function ChatView({ initialChatId }: ChatViewProps) {
               <Feather name="share-2" size={18} color={colors.textSecondary} />
             )}
           </Pressable>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={t("shell.settings")}
-            onPress={() => router.push("/settings")}
-            hitSlop={12}
-            style={[styles.headerButton, { backgroundColor: colors.bgTertiary }]}
-          >
-            <Feather name="settings" size={19} color={colors.textSecondary} />
-          </Pressable>
+
         </View>
       </View>
 
