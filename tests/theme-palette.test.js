@@ -183,7 +183,6 @@ describe("buildThemeDesign", () => {
     expect(design.image["--theme-scrim"]).toBe(design.scrim);
     for (const key of [
       "--theme-column-bg",
-      "--theme-sidebar-bg",
       "--theme-message-bg",
       "--theme-panel-bg",
       "--theme-panel-strong-bg",
@@ -202,7 +201,6 @@ describe("buildThemeDesign", () => {
     // Every text-bearing surface resolves to AA against the worst-case picture.
     for (const token of [
       design.image["--theme-column-bg"],
-      design.image["--theme-sidebar-bg"],
       design.image["--theme-message-bg"],
       design.image["--theme-panel-bg"],
       design.image["--theme-panel-strong-bg"],

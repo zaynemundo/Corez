@@ -9790,8 +9790,12 @@ html.theme-has-backgrounds .conversation-persona-footer {
   border-radius: var(--radius-xl);
 }
 
-html.theme-has-backgrounds .sidebar {
-  background-color: var(--theme-sidebar-bg);
+/* The sidebar is part of the artwork canvas: its panel and both inner
+   containers drop their fills so the wallpaper runs edge to edge. */
+html.theme-has-backgrounds .sidebar,
+html.theme-has-backgrounds .sidebar-full,
+html.theme-has-backgrounds .sidebar-rail {
+  background-color: transparent;
 }
 
 html.theme-has-backgrounds .message-wrapper.user .message-content,
