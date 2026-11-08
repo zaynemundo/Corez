@@ -47,6 +47,14 @@ import {
   classifyIntent as classifyEngineIntent,
   classifyPublicIntent,
 } from "@corez_ai/shared/intent";
+import {
+  buildPersonaPrompt,
+  cleanReply,
+  conversationHistory,
+  orderSpeakers,
+  speakersForPrompt,
+  type Persona,
+} from "@/lib/conversation";
 import { useAuth } from "@/state/auth";
 import { useTheme } from "@/state/theme";
 import { useI18n } from "@/i18n";
@@ -80,6 +88,7 @@ export function ChatView({ initialChatId }: ChatViewProps) {
   const [notice, setNotice] = useState<string | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [sharingChat, setSharingChat] = useState(false);
+  const [conversationPersonas, setConversationPersonas] = useState<Persona[]>([]);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [attachmentBusy, setAttachmentBusy] = useState(false);
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
@@ -170,6 +179,11 @@ export function ChatView({ initialChatId }: ChatViewProps) {
         const detail = await getChatWithCache(id);
         if (seq !== loadSeqRef.current) return;
         setChatTitle(detail.title || null);
+        setConversationPersonas(
+          detail.chatMode === "conversation" && Array.isArray(detail.personas)
+            ? detail.personas
+            : [],
+        );
         setOfflineNotice(Boolean(detail.offline));
         publishMessages(
           (detail.messages || [])
@@ -203,6 +217,11 @@ export function ChatView({ initialChatId }: ChatViewProps) {
                     };
                   })
                 : undefined,
+              ...(message.speakerId ? { speakerId: message.speakerId } : {}),
+              ...(message.speakerName
+                ? { speakerName: message.speakerName }
+                : {}),
+              ...(message.turnId ? { turnId: message.turnId } : {}),
             })),
         );
       } catch (caught) {
@@ -219,6 +238,7 @@ export function ChatView({ initialChatId }: ChatViewProps) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setChatId(null);
       setChatTitle(null);
+      setConversationPersonas([]);
       setOfflineNotice(false);
       publishMessages([]);
       setLoadingChat(false);
@@ -291,6 +311,8 @@ export function ChatView({ initialChatId }: ChatViewProps) {
           assetKey,
         }),
       );
+      const conversation = conversationPersonas.length === 2;
+      const conversationTurnId = `turn-${Date.now()}`;
 
       const history: ChatHistoryMessage[] = messagesRef.current
         .filter((message) => !message.streaming && message.content.trim())
@@ -310,6 +332,12 @@ export function ChatView({ initialChatId }: ChatViewProps) {
         if (!activeChatId) {
           const created = await createChat({
             title: deriveChatTitle(prompt),
+            ...(conversation
+              ? {
+                  chatMode: "conversation" as const,
+                  personas: conversationPersonas,
+                }
+              : {}),
             firstMessage: {
               role: "user",
               content: prompt,
@@ -328,6 +356,13 @@ export function ChatView({ initialChatId }: ChatViewProps) {
             ...(displayAttachments.length > 0
               ? { attachments: displayAttachments }
               : {}),
+            ...(conversation
+              ? {
+                  speakerId: "user",
+                  speakerName: "You",
+                  turnId: conversationTurnId,
+                }
+              : {}),
           });
         }
       } catch (caught) {
@@ -335,6 +370,151 @@ export function ChatView({ initialChatId }: ChatViewProps) {
         return;
       }
       setOfflineNotice(false);
+
+      if (conversation) {
+        const now = Date.now();
+        const userMessage: ChatMessageModel = {
+          id: `u-${now}`,
+          role: "user",
+          content: prompt,
+          speakerId: "user",
+          speakerName: "You",
+          turnId: conversationTurnId,
+          ...(displayAttachments.length > 0
+            ? { attachments: displayAttachments }
+            : {}),
+        };
+        const baseHistory: ChatHistoryMessage[] = [
+          ...conversationHistory(messagesRef.current),
+          {
+            role: "user" as const,
+            content: prompt,
+            ...(apiAttachments.length > 0
+              ? { attachments: apiAttachments }
+              : {}),
+          },
+        ];
+        publishMessages((prev) => [...prev, userMessage]);
+        setInput("");
+        setAttachments([]);
+        setAttachmentError(null);
+        setStreaming(true);
+        setThinkingExpanded(true);
+        setElapsedMs(0);
+        startedAtRef.current = Date.now();
+        stopTimer();
+        timerRef.current = setInterval(() => {
+          setElapsedMs(Date.now() - startedAtRef.current);
+        }, 250);
+
+        const controller = new AbortController();
+        abortRef.current = controller;
+        const publicIntent = classifyPublicIntent(prompt);
+        const fineIntent = classifyEngineIntent(prompt);
+        let previousSpeaker: Persona | null = null;
+
+        try {
+          const speakers = orderSpeakers(
+            speakersForPrompt(conversationPersonas, prompt),
+          );
+          for (const speaker of speakers) {
+            if (controller.signal.aborted) break;
+            const placeholderId = `a-${Date.now()}-${speaker.id}`;
+            publishMessages((prev) => [
+              ...prev,
+              {
+                id: placeholderId,
+                role: "assistant",
+                content: "",
+                thinking: "",
+                streaming: true,
+                speakerId: speaker.id,
+                speakerName: speaker.name,
+                turnId: conversationTurnId,
+              },
+            ]);
+            let thinking = "";
+            let text = "";
+            const personaPrompt = buildPersonaPrompt({
+              speaker,
+              personas: conversationPersonas,
+              previousSpeaker,
+              userPrompt: prompt,
+            });
+            try {
+              const result = await streamChatTurn(
+                {
+                  prompt: personaPrompt,
+                  messages: baseHistory,
+                  intent: {
+                    type: publicIntent.label,
+                    confidence: publicIntent.confidence,
+                  },
+                  fineIntent,
+                },
+                {
+                  onDelta: (delta) => {
+                    text += delta;
+                    patchMessage(placeholderId, { content: text });
+                  },
+                  onThinking: (chunk) => {
+                    thinking += chunk;
+                    patchMessage(placeholderId, { thinking });
+                  },
+                },
+                controller.signal,
+              );
+              const cleaned = cleanReply(text, speaker.name);
+              patchMessage(placeholderId, {
+                content: cleaned || text,
+                streaming: false,
+                thinking,
+                thinkingSeconds: Math.max(
+                  0,
+                  Math.round((Date.now() - startedAtRef.current) / 1000),
+                ),
+                ...(result.errorEvent?.message
+                  ? { error: result.errorEvent.message }
+                  : {}),
+              });
+              if (cleaned.trim()) {
+                baseHistory.push({
+                  role: "assistant",
+                  content: `${speaker.name}: ${cleaned}`,
+                });
+                if (activeChatId) {
+                  await appendMessage(activeChatId, {
+                    role: "assistant",
+                    content: cleaned,
+                    turnId: conversationTurnId,
+                    speakerId: speaker.id,
+                    speakerName: speaker.name,
+                    modelId: "deepseek-v4.1-flash",
+                  }).catch(() => {});
+                }
+              }
+            } catch (caught) {
+              patchMessage(placeholderId, {
+                streaming: false,
+                ...(controller.signal.aborted
+                  ? {}
+                  : { error: friendlyError(caught) }),
+              });
+            }
+            previousSpeaker = speaker;
+          }
+        } finally {
+          stopTimer();
+          setElapsedMs(0);
+          setStreaming(false);
+          abortRef.current = null;
+        }
+
+        if (createdThisTurn && activeChatId) {
+          router.replace(`/chat/${activeChatId}`);
+        }
+        return;
+      }
 
       const now = Date.now();
       const userId = `u-${now}`;
@@ -484,7 +664,17 @@ export function ChatView({ initialChatId }: ChatViewProps) {
         router.replace(`/chat/${activeChatId}`);
       }
     },
-    [attachments, chatId, input, streaming, publishMessages, patchMessage, stopTimer, t],
+    [
+      attachments,
+      chatId,
+      conversationPersonas,
+      input,
+      streaming,
+      publishMessages,
+      patchMessage,
+      stopTimer,
+      t,
+    ],
   );
 
   const isEmpty = messages.length === 0;
@@ -620,15 +810,22 @@ export function ChatView({ initialChatId }: ChatViewProps) {
             </Text>
             <View style={styles.starters}>
               {[
-                t("home.starters.website"),
-                t("home.starters.game"),
-                t("home.starters.image"),
-                t("home.starters.research"),
-              ].map((label) => (
+                { label: t("home.starters.website"), conversation: false },
+                { label: t("home.starters.game"), conversation: false },
+                { label: t("home.starters.image"), conversation: false },
+                { label: t("home.starters.research"), conversation: false },
+                { label: t("home.starters.conversation"), conversation: true },
+              ].map(({ label, conversation: isConversationStarter }) => (
                 <Pressable
                   key={label}
                   accessibilityRole="button"
-                  onPress={() => setInput(`${label}: `)}
+                  onPress={() => {
+                    if (isConversationStarter) {
+                      router.push("/conversation/new");
+                      return;
+                    }
+                    setInput(`${label}: `);
+                  }}
                   style={({ pressed }) => [
                     styles.starter,
                     {

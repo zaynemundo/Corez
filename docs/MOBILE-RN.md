@@ -20,6 +20,7 @@ the Capacitor shell in `android/` (see [MOBILE.md](./MOBILE.md)) is legacy.
 | HTML artifacts render as a compact **Preview / Revise** card instead of dumping the long source into the conversation; Copy stays available for ordinary code snippets | Done |
 | UI icons: Feather vector icons instead of emoji/text glyphs in the composer, attachment sheet, chat header, back/close buttons, thinking panel and history actions | Done |
 | Custom themes: saved Worker themes load in Settings → Appearance (apply/delete), the last applied theme is cached for instant boot, and an `@theme` proposal in chat renders as an interactive card with colours / colours + artwork options | Done |
+| Conversation mode: "Start a conversation" on the home screen opens a two-persona setup, the chat stores `chatMode: conversation` + personas, both characters reply in turn with speaker avatars, and `@name` mentions route a single reply | Done |
 | Voice dictation: expo-audio recording → `/api/transcribe` (Whisper), en/ar language, 120s cap | Done |
 | Chat management: rename, pin/unpin, delete, pinned/recent sections, title header | Done |
 | Offline read cache: SQLite snapshot of the chat list and open conversation, marked as an offline copy | Done |

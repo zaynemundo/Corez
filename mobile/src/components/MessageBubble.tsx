@@ -30,6 +30,10 @@ export interface ChatMessageModel {
   streaming?: boolean;
   error?: string | null;
   attachments?: MessageAttachment[];
+  speakerId?: string | null;
+  speakerName?: string | null;
+  turnId?: string | null;
+  modelId?: string | null;
 }
 
 interface MessageBubbleProps {
@@ -128,9 +132,34 @@ export function MessageBubble({
       ? message.thinking
       : (message.thinking || "").trim(),
   );
+  const speakerInitials = String(message.speakerName || "")
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part.charAt(0).toUpperCase())
+    .join("");
 
   return (
     <View style={styles.assistantRow}>
+      {message.speakerName ? (
+        <View style={styles.speakerRow}>
+          <View
+            style={[
+              styles.speakerAvatar,
+              { backgroundColor: colors.bgTertiary, borderColor: colors.border },
+            ]}
+          >
+            <Text
+              style={[styles.speakerInitials, { color: colors.textPrimary }]}
+            >
+              {speakerInitials || "AI"}
+            </Text>
+          </View>
+          <Text style={[styles.speakerName, { color: colors.textSecondary }]}>
+            {message.speakerName}
+          </Text>
+        </View>
+      ) : null}
       {hasThinking ? (
         <ThinkingPanel
           text={message.thinking || ""}
@@ -206,6 +235,29 @@ const styles = StyleSheet.create({
   assistantRow: {
     marginBottom: 22,
     paddingHorizontal: 16,
+  },
+  speakerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 8,
+  },
+  speakerAvatar: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    borderWidth: StyleSheet.hairlineWidth,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  speakerInitials: {
+    fontSize: 10.5,
+    fontWeight: "700",
+    letterSpacing: 0.4,
+  },
+  speakerName: {
+    fontSize: 12.5,
+    fontWeight: "600",
   },
   assistantText: {
     fontSize: 15,

@@ -7,6 +7,7 @@
  */
 import { requestJson } from "./client";
 import { readCache, removeCache, writeCache } from "@/lib/offlineCache";
+import type { Persona } from "@/lib/conversation";
 
 export interface ChatSummary {
   id: string;
@@ -16,6 +17,7 @@ export interface ChatSummary {
   projectId?: string | null;
   pinnedAt?: number | null;
   chatMode?: "single" | "conversation";
+  personas?: Persona[];
   lastUserAt?: number | null;
   active?: boolean;
 }
@@ -27,6 +29,9 @@ export interface StoredMessage {
   attachments?: unknown[] | null;
   createdAt?: number;
   turnId?: string | null;
+  speakerId?: string | null;
+  speakerName?: string | null;
+  modelId?: string | null;
 }
 
 export interface ChatDetail extends ChatSummary {
@@ -101,6 +106,8 @@ export async function listChats(): Promise<ListedChats> {
 
 export async function createChat(input: {
   title?: string;
+  chatMode?: "single" | "conversation";
+  personas?: Persona[];
   firstMessage?: {
     role: "user";
     content: string;
@@ -124,6 +131,9 @@ export async function appendMessage(
     content: string;
     attachments?: unknown[];
     turnId?: string;
+    speakerId?: string;
+    speakerName?: string;
+    modelId?: string;
   },
 ): Promise<void> {
   await requestJson<{ success?: boolean }>(
