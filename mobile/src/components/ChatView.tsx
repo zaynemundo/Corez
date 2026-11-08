@@ -720,11 +720,7 @@ export function ChatView({ initialChatId }: ChatViewProps) {
               >
                 {chatTitle}
               </Text>
-            ) : (
-              <Text style={[styles.previewTag, { color: colors.textMuted }]}>
-                {t("common.chat.mobileTag")}
-              </Text>
-            )}
+            ) : null}
           </View>
         </View>
         <View style={styles.headerActions}>
