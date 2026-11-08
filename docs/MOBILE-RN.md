@@ -19,6 +19,7 @@ the Capacitor shell in `android/` (see [MOBILE.md](./MOBILE.md)) is legacy.
 | Composer parity with the web: one right-hand action that is the microphone while the input is empty and Send/Stop as soon as there is text (or while streaming) | Done |
 | HTML artifacts render as a compact **Preview / Revise** card instead of dumping the long source into the conversation; Copy stays available for ordinary code snippets | Done |
 | UI icons: Feather vector icons instead of emoji/text glyphs in the composer, attachment sheet, chat header, back/close buttons, thinking panel and history actions | Done |
+| Custom themes: saved Worker themes load in Settings → Appearance (apply/delete), the last applied theme is cached for instant boot, and an `@theme` proposal in chat renders as an interactive card with colours / colours + artwork options | Done |
 | Voice dictation: expo-audio recording → `/api/transcribe` (Whisper), en/ar language, 120s cap | Done |
 | Chat management: rename, pin/unpin, delete, pinned/recent sections, title header | Done |
 | Offline read cache: SQLite snapshot of the chat list and open conversation, marked as an offline copy | Done |

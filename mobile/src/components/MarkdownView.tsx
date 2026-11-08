@@ -33,6 +33,12 @@ import {
 import { downloadAndShareFile } from "@/lib/downloads";
 import { ImageFullscreenModal } from "./ImageFullscreenModal";
 import { CanvasView } from "./CanvasView";
+import { ThemeProposalCard } from "./ThemeProposalCard";
+import {
+  THEME_FENCE_LANGUAGE,
+  parseThemeProposal,
+  stripThemeMarkers,
+} from "@/lib/themeProposal";
 
 const MAX_CACHE_ENTRIES = 60;
 const parseCache = new Map<string, Token[]>();
@@ -67,7 +73,10 @@ export function MarkdownView({
   onReviseCode?: (code: string) => void;
   publishSessionId?: string | null;
 }) {
-  const tokens = useMemo(() => parseMarkdown(content), [content]);
+  const tokens = useMemo(
+    () => parseMarkdown(stripThemeMarkers(content)),
+    [content],
+  );
   const [fullscreenUri, setFullscreenUri] = useState<string | null>(null);
   const [canvasHtml, setCanvasHtml] = useState<string | null>(null);
   return (
@@ -372,6 +381,10 @@ function CodeBlock({ code, language }: { code: string; language: string }) {
   const [copied, setCopied] = useState(false);
   const resetTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const canPreview = isHtmlLanguage(language) || isRenderableHtml(code);
+  const themeProposal =
+    String(language || "").trim().toLowerCase() === THEME_FENCE_LANGUAGE
+      ? parseThemeProposal(code)
+      : null;
 
   useEffect(
     () => () => {
@@ -390,6 +403,10 @@ function CodeBlock({ code, language }: { code: string; language: string }) {
       // Clipboard failures are non-fatal; the code is still selectable.
     }
   };
+
+  if (themeProposal) {
+    return <ThemeProposalCard proposal={themeProposal} />;
+  }
 
   if (canPreview) {
     // Artifacts become a compact action bar (like the web) instead of dumping

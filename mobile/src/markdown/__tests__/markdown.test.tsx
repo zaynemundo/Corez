@@ -146,4 +146,30 @@ describe("MarkdownView rendering", () => {
     });
     expect(screen.queryByText("Revise")).toBeNull();
   });
+
+  it("renders an @theme proposal as a card instead of raw JSON", async () => {
+    const proposal = {
+      v: 1,
+      proposalId: "thp_123abc",
+      name: "Racing Red",
+      palette: {
+        background: "#101010",
+        surface: "#1a1a1a",
+        text: "#f5f5f5",
+        muted: "#a0a0a0",
+        border: "#333333",
+      },
+      images: null,
+      imagePrompts: { desktop: "", mobile: "" },
+      options: { palette: true, backgrounds: false },
+      slots: { used: 0, max: 2 },
+      expiresAt: Date.now() + 60_000,
+    };
+    await renderMarkdown(
+      "```corez-theme\n" + JSON.stringify(proposal) + "\n```",
+    );
+    expect(screen.getByText("Racing Red")).toBeTruthy();
+    expect(screen.getByText("Use colors")).toBeTruthy();
+    expect(screen.queryByText(/proposalId/)).toBeNull();
+  });
 });
