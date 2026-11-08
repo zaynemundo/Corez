@@ -9,7 +9,15 @@
     "userInterfaceStyle": "dark",
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "pro.corez.app"
+      "bundleIdentifier": "pro.corez.app",
+      "buildNumber": "1",
+      "icon": "./assets/icon-ios.png",
+      "associatedDomains": ["applinks:corez.pro"],
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSPhotoLibraryAddUsageDescription": "Corez saves generated images to your photo library when you ask it to.",
+        "NSFaceIDUsageDescription": "Corez does not use Face ID."
+      }
     },
     "android": {
       "package": "pro.corez.app",

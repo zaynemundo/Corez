@@ -47,6 +47,9 @@ the Capacitor shell in `android/` (see [MOBILE.md](./MOBILE.md)) is legacy.
 The on-device spike is the Phase 0 go/no-go gate: it must prove bearer login,
 live SSE streaming, abort, and the release APK build before Phase 1 starts.
 
+| iOS: Expo target configured (bundle id, opaque 1024 icon, associated domains, Info.plist usage strings), AASA endpoint added, iOS Hermes bundle verified; EAS build profiles ready | Configured; an installable build needs an Apple Developer account |
+| Download page: `corez.pro/download` landing page + `corez.pro/download/corez.apk` streams the sideload APK from R2 with byte-range support | Done |
+
 ## Shared package (`packages/corez-shared`)
 
 Pure logic used by both clients, imported by bare specifier:
@@ -342,6 +345,52 @@ APK (`mobile/build-artifacts/app-release.apk`) was installed and exercised via
 Raw screenshots and UI dumps (including the signed-in state with the account
 email) live in `.tools/spike/` and are deliberately **not committed**; the
 committed `phone-hello-answer.png` shows only the answer screen.
+
+## iOS
+
+The React Native client is cross-platform and iOS is configured from the same
+code base. Windows cannot generate the Xcode project or sign an IPA, so iOS is
+built on **EAS Build** (macOS runners) and installed through an ad-hoc link or
+TestFlight.
+
+Target configuration (`mobile/app.json`):
+
+- `ios.bundleIdentifier`: `pro.corez.app`, build number `1`
+- Opaque 1024px `assets/icon-ios.png` (Apple rejects icons with an alpha channel)
+- `associatedDomains: ["applinks:corez.pro"]`; the Worker serves
+  `/.well-known/apple-app-site-association` from `APPLE_TEAM_ID` /
+  `APPLE_BUNDLE_ID` (empty Team ID → empty details; links verify once set)
+- Info.plist usage strings for camera, photo library, microphone and Face ID
+  come from the same Expo plugins as Android; `ITSAppUsesNonExemptEncryption`
+  is `false`
+- Camera/gallery/voice dictation, share sheets, SecureStore sessions, themes,
+  conversation mode, Sites and the canvas are shared components, not forks
+
+Verified on Windows: `npx expo config --type public` parses, `npx expo export
+--platform ios` produces an 11.3 MB Hermes bundle (71 files), and the AASA +
+download tests pass. `npx expo prebuild --platform ios` is refused on Windows by
+Expo (“run from macOS or Linux”), so native project generation happens inside
+EAS.
+
+### Building the iOS app
+
+Apple requires the **Apple Developer Program** (99 USD/year) before a signed
+build can be installed on a real iPhone. Once enrolled:
+
+```bash
+npx eas-cli login
+npx eas-cli build --platform ios --profile preview      # ad-hoc install link
+npx eas-cli build --platform ios --profile production   # TestFlight / App Store
+npx eas-cli submit --platform ios --profile production
+```
+
+EAS creates the distribution certificate and provisioning profile; the ad-hoc
+profile registers tester devices. Friends install from the EAS link (ad-hoc) or
+TestFlight. For Universal Links, put the Apple Team ID in `APPLE_TEAM_ID`
+(`wrangler.jsonc`) and redeploy.
+
+Until an Apple Developer account is connected, no installable IPA can be
+produced — Apple does not allow Windows sideloading.
 
 ## Known limitations at this stage
 

@@ -53,6 +53,7 @@ import {
 import { handleR2Assets, handleR2Apps } from "./r2Routes.js";
 import { handlePublish } from "./publishRoutes.js";
 import { handleDownload } from "./downloadRoutes.js";
+import { handleAppleAppSiteAssociation } from "./iosLinks.js";
 import {
   handleTitleFastPath,
   tryGreetingOrIdentityFastPath,
@@ -652,6 +653,12 @@ export default {
       pathname === "/download/apk"
     ) {
       return handleDownload(request, env);
+    }
+    if (
+      pathname === "/.well-known/apple-app-site-association" ||
+      pathname === "/.well-known/apple-app-site-association/"
+    ) {
+      return handleAppleAppSiteAssociation(request, env);
     }
     if (pathname === "/.well-known/assetlinks.json" && request.method === "GET") {
       return new Response(JSON.stringify(buildAndroidAssetLinks(env)), {
