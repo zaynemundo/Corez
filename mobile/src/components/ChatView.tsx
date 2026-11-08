@@ -658,6 +658,7 @@ export function ChatView({ initialChatId }: ChatViewProps) {
               thinkingExpanded={thinkingExpanded}
               onToggleThinking={() => setThinkingExpanded((prev) => !prev)}
               onReviseCode={reviseCode}
+              publishSessionId={chatId}
               streamElapsedMs={elapsedMs}
               tokensPerSecond={liveRate}
             />

@@ -1,5 +1,7 @@
 import { requestJson } from "../client";
 import {
+  getPublishedPage,
+  isValidPublishSlug,
   listPublishedPages,
   publishHtml,
   publishedPageUrl,
@@ -45,6 +47,7 @@ describe("published sites API", () => {
     expect(result).toEqual({
       slug: "moon",
       url: "https://corez.pro/moon",
+      customized: false,
     });
     expect(requestMock).toHaveBeenCalledWith("/api/publish", {
       method: "POST",
@@ -73,6 +76,57 @@ describe("published sites API", () => {
         }),
       }),
     );
+  });
+
+  it("renames a page by sending the new slug plus previousSlug", async () => {
+    requestMock.mockResolvedValueOnce({
+      slug: "solar-atlas",
+      customized: true,
+    });
+    const result = await publishHtml({
+      html: "<html></html>",
+      title: "Solar Atlas",
+      slug: "solar-atlas",
+      previousSlug: "666dqq-632",
+      pages: { "about.html": "<html>about</html>" },
+    });
+    expect(result).toEqual({
+      slug: "solar-atlas",
+      url: "https://corez.pro/solar-atlas",
+      customized: true,
+    });
+    expect(requestMock).toHaveBeenCalledWith("/api/publish", {
+      method: "POST",
+      body: expect.objectContaining({
+        slug: "solar-atlas",
+        previousSlug: "666dqq-632",
+        pages: { "about.html": "<html>about</html>" },
+      }),
+      timeoutMs: 60_000,
+    });
+  });
+
+  it("loads the owner's editable copy for the URL editor", async () => {
+    requestMock.mockResolvedValueOnce({
+      slug: "solar-system",
+      html: "<html></html>",
+      pages: {},
+    });
+    await getPublishedPage("solar-system");
+    expect(requestMock).toHaveBeenCalledWith("/api/publish/solar-system", {
+      method: "GET",
+    });
+    await expect(getPublishedPage("")).rejects.toThrow(/slug is required/i);
+  });
+
+  it("validates custom URL slugs like the Worker", () => {
+    expect(isValidPublishSlug("solar-system")).toBe(true);
+    expect(isValidPublishSlug("abc")).toBe(true);
+    expect(isValidPublishSlug("ab")).toBe(false);
+    expect(isValidPublishSlug("Solar-System")).toBe(true); // lowercased
+    expect(isValidPublishSlug("solar--system")).toBe(false);
+    expect(isValidPublishSlug("-solar")).toBe(false);
+    expect(isValidPublishSlug("solar system")).toBe(false);
   });
 
   it("refuses empty content and a response without a slug", async () => {

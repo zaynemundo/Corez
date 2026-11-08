@@ -11,12 +11,14 @@ import {
   ActivityIndicator,
   Alert,
   Linking,
+  Modal,
   Pressable,
   RefreshControl,
   ScrollView,
   Share,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
@@ -24,9 +26,13 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { SessionGate } from "@/components/SessionGate";
 import {
+  getPublishedPage,
+  isValidPublishSlug,
   listPublishedPages,
+  publishHtml,
   unpublishPage,
   type PublishedPage,
+  type PublishedPageDetail,
 } from "@/api/publish";
 import { copyText } from "@/lib/downloads";
 import { friendlyError } from "@/lib/errors";
@@ -88,6 +94,76 @@ function SitesView() {
         onPress: () => removeMutation.mutate(page.slug),
       },
     ]);
+  };
+
+  const [slugEditor, setSlugEditor] = useState<{
+    page: PublishedPage;
+    detail: PublishedPageDetail | null;
+    value: string;
+    busy: boolean;
+    error: string | null;
+  } | null>(null);
+
+  const openSlugEditor = async (page: PublishedPage) => {
+    setNotice(null);
+    setSlugEditor({
+      page,
+      detail: null,
+      value: page.slug,
+      busy: true,
+      error: null,
+    });
+    try {
+      const detail = await getPublishedPage(page.slug);
+      setSlugEditor((previous) =>
+        previous && previous.page.slug === page.slug
+          ? { ...previous, detail, value: detail.slug || page.slug, busy: false }
+          : previous,
+      );
+    } catch (error) {
+      setSlugEditor((previous) =>
+        previous && previous.page.slug === page.slug
+          ? {
+              ...previous,
+              busy: false,
+              error: friendlyError(error, t("sites.loadFailed")),
+            }
+          : previous,
+      );
+    }
+  };
+
+  const saveSlug = async () => {
+    const editor = slugEditor;
+    if (!editor || !editor.detail || editor.busy) return;
+    const next = editor.value.trim().toLowerCase();
+    if (next === editor.page.slug) {
+      setSlugEditor(null);
+      return;
+    }
+    if (!isValidPublishSlug(next)) {
+      setSlugEditor({ ...editor, error: t("sites.urlInvalid") });
+      return;
+    }
+    setSlugEditor({ ...editor, busy: true, error: null });
+    try {
+      const result = await publishHtml({
+        html: editor.detail.html,
+        title: editor.detail.title || editor.page.title,
+        slug: next,
+        previousSlug: editor.page.slug,
+        pages: editor.detail.pages,
+      });
+      setSlugEditor(null);
+      setNotice(`${t("sites.urlChanged")} ${result.url}`);
+      await queryClient.invalidateQueries({ queryKey: ["published-pages"] });
+    } catch (error) {
+      setSlugEditor({
+        ...editor,
+        busy: false,
+        error: friendlyError(error, t("sites.loadFailed")),
+      });
+    }
   };
 
   return (
@@ -208,6 +284,16 @@ function SitesView() {
                 </Pressable>
                 <Pressable
                   accessibilityRole="button"
+                  accessibilityLabel={`${t("sites.changeUrl")} ${page.title || page.slug}`}
+                  onPress={() => void openSlugEditor(page)}
+                  style={[styles.action, { borderColor: colors.borderHover }]}
+                >
+                  <Text style={[styles.actionLabel, { color: colors.textPrimary }]}>
+                    {t("sites.changeUrl")}
+                  </Text>
+                </Pressable>
+                <Pressable
+                  accessibilityRole="button"
                   accessibilityLabel={`${t("sites.copy")} ${page.title || page.slug}`}
                   onPress={() => void copyLink(page)}
                   style={[styles.action, { borderColor: colors.borderHover }]}
@@ -246,6 +332,92 @@ function SitesView() {
           ))
         )}
       </ScrollView>
+
+      <Modal
+        visible={Boolean(slugEditor)}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setSlugEditor(null)}
+      >
+        <View style={[styles.modalBackdrop, { backgroundColor: colors.overlay }]}>
+          <View
+            style={[
+              styles.modalCard,
+              { backgroundColor: colors.bgSecondary, borderColor: colors.border },
+            ]}
+          >
+            <Text style={[styles.modalTitle, { color: colors.textPrimary }]}>
+              {t("sites.changeUrlTitle")}
+            </Text>
+            <Text style={[styles.hint, { color: colors.textMuted, textAlign: "left" }]}>
+              {t("sites.changeUrlHint")}
+            </Text>
+            <View style={styles.slugRow}>
+              <Text style={{ color: colors.textMuted, fontSize: 13 }}>
+                corez.pro/
+              </Text>
+              <TextInput
+                value={slugEditor?.value ?? ""}
+                onChangeText={(value) =>
+                  setSlugEditor((previous) =>
+                    previous ? { ...previous, value, error: null } : previous,
+                  )
+                }
+                autoCapitalize="none"
+                autoCorrect={false}
+                editable={!slugEditor?.busy}
+                accessibilityLabel={t("sites.newUrl")}
+                style={[
+                  styles.slugInput,
+                  {
+                    color: colors.textPrimary,
+                    borderColor: colors.border,
+                    backgroundColor: colors.bgPrimary,
+                  },
+                ]}
+              />
+            </View>
+            {slugEditor?.error ? (
+              <Text
+                accessibilityRole="alert"
+                style={{ color: colors.negative, fontSize: 12.5, lineHeight: 18 }}
+              >
+                {slugEditor.error}
+              </Text>
+            ) : null}
+            <View style={styles.modalActions}>
+              <Pressable
+                accessibilityRole="button"
+                disabled={slugEditor?.busy}
+                onPress={() => setSlugEditor(null)}
+                style={[styles.action, { borderColor: colors.borderHover }]}
+              >
+                <Text style={{ color: colors.textSecondary }}>
+                  {t("common.action.cancel")}
+                </Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={t("sites.saveUrl")}
+                disabled={slugEditor?.busy || !slugEditor?.detail}
+                onPress={() => void saveSlug()}
+                style={[
+                  styles.saveUrlButton,
+                  { backgroundColor: colors.actionStrong },
+                ]}
+              >
+                {slugEditor?.busy ? (
+                  <ActivityIndicator size="small" color={colors.bgPrimary} />
+                ) : (
+                  <Text style={{ color: colors.bgPrimary, fontWeight: "600" }}>
+                    {t("sites.saveUrl")}
+                  </Text>
+                )}
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -299,4 +471,46 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   actionLabel: { fontSize: 12.5, fontWeight: "600" },
+  modalBackdrop: {
+    flex: 1,
+    justifyContent: "center",
+    paddingHorizontal: 22,
+  },
+  modalCard: {
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 16,
+    padding: 16,
+    gap: 10,
+  },
+  modalTitle: { fontFamily: "Outfit_600SemiBold", fontSize: 17 },
+  slugRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    flexWrap: "wrap",
+  },
+  slugInput: {
+    flexGrow: 1,
+    minWidth: 160,
+    minHeight: 42,
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    fontSize: 14,
+  },
+  modalActions: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    alignItems: "center",
+    gap: 10,
+    marginTop: 4,
+  },
+  saveUrlButton: {
+    minHeight: 40,
+    minWidth: 110,
+    paddingHorizontal: 18,
+    borderRadius: 9999,
+    alignItems: "center",
+    justifyContent: "center",
+  },
 });

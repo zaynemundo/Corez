@@ -29,9 +29,11 @@ import { friendlyError } from "@/lib/errors";
 interface CanvasViewProps {
   html: string | null;
   onClose: () => void;
+  /** Chat this artifact belongs to, so republishing keeps the same public URL. */
+  sessionId?: string | null;
 }
 
-export function CanvasView({ html, onClose }: CanvasViewProps) {
+export function CanvasView({ html, onClose, sessionId }: CanvasViewProps) {
   const { theme } = useTheme();
   const { t } = useI18n();
   const colors = theme.colors;
@@ -75,6 +77,7 @@ export function CanvasView({ html, onClose }: CanvasViewProps) {
       const result = await publishHtml({
         html,
         title: artifactTitle(html),
+        sessionId: sessionId || null,
       });
       setPublishedUrl(result.url);
     } catch (caught) {

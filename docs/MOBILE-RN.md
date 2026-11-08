@@ -25,6 +25,7 @@ the Capacitor shell in `android/` (see [MOBILE.md](./MOBILE.md)) is legacy.
 | Image viewer: tap an inline image for fullscreen, native share/save, copy link | Done |
 | Canvas preview: complete HTML artifacts open in a WebView; copy HTML and native share/save from chat | Done |
 | Publishing: publish from the canvas with a public link; Sites screen lists, opens, shares, copies and unpublishes pages | Done |
+| Publishing parity: the canvas sends its chat id as `sessionId`, so republishing a creation keeps the same public URL instead of minting duplicate slugs; Sites has **Change URL** (owner copy → `slug` + `previousSlug`) and the Worker's one-time custom-slug rule is surfaced honestly | Done |
 | Sites analytics: 7/30/90-day traffic report per published page — totals, daily bars, top pages, source/country/device breakdowns | Done |
 | Downloads: generated PDF/ZIP/office links in answers download to the device and open the native share sheet | Done |
 | Deep links: `corez://` scheme plus Android App Links for `/chat`, `/sites` and `/share/chat`; `/.well-known/assetlinks.json` served by the Worker from `ANDROID_APP_SHA256` | Done — link verification confirmed on the Android 16 emulator |

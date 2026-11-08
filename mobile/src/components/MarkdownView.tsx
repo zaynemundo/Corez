@@ -61,9 +61,11 @@ function stripHtml(value: string): string {
 export function MarkdownView({
   content,
   onReviseCode,
+  publishSessionId,
 }: {
   content: string;
   onReviseCode?: (code: string) => void;
+  publishSessionId?: string | null;
 }) {
   const tokens = useMemo(() => parseMarkdown(content), [content]);
   const [fullscreenUri, setFullscreenUri] = useState<string | null>(null);
@@ -84,7 +86,11 @@ export function MarkdownView({
             />
           ) : null}
           {canvasHtml ? (
-            <CanvasView html={canvasHtml} onClose={() => setCanvasHtml(null)} />
+            <CanvasView
+              html={canvasHtml}
+              onClose={() => setCanvasHtml(null)}
+              sessionId={publishSessionId}
+            />
           ) : null}
         </ReviseCodeContext.Provider>
       </CanvasOpenContext.Provider>
