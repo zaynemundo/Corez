@@ -22,6 +22,7 @@ import { useTheme } from "@/state/theme";
 import { useI18n } from "@/i18n";
 import type { Attachment, AttachmentSource } from "@/lib/attachments";
 import type { DictationStatus } from "@/hooks/useDictation";
+import { resolveComposerAction } from "@/lib/composerAction";
 
 interface ComposerProps {
   value: string;
@@ -67,8 +68,15 @@ export const Composer = forwardRef<TextInputInstance, ComposerProps>(
     const { theme } = useTheme();
     const { t } = useI18n();
     const colors = theme.colors;
-    const canSend =
-      (value.trim().length > 0 || attachments.length > 0) && !streaming;
+    const hasContent =
+      value.trim().length > 0 || attachments.length > 0;
+    const canSend = hasContent && !streaming;
+    const action = resolveComposerAction({
+      streaming,
+      hasContent,
+      dictationStatus,
+      canDictate: Boolean(onToggleDictation),
+    });
     const [menuOpen, setMenuOpen] = useState(false);
 
     const pick = (source: AttachmentSource) => {
@@ -164,44 +172,6 @@ export const Composer = forwardRef<TextInputInstance, ComposerProps>(
                 )}
               </Pressable>
             ) : null}
-            {onToggleDictation ? (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={
-                  dictationStatus === "recording"
-                    ? t("chat.dictation.stop")
-                    : t("chat.dictation.start")
-                }
-                accessibilityState={{
-                  disabled: dictationStatus === "transcribing",
-                  busy: dictationStatus === "transcribing",
-                }}
-                onPress={onToggleDictation}
-                disabled={dictationStatus === "transcribing"}
-                style={({ pressed }) => [
-                  styles.attachButton,
-                  { opacity: pressed ? 0.6 : 1 },
-                ]}
-              >
-                {dictationStatus === "transcribing" ? (
-                  <ActivityIndicator size="small" color={colors.textSecondary} />
-                ) : (
-                  <Text
-                    style={[
-                      styles.micGlyph,
-                      {
-                        color:
-                          dictationStatus === "recording"
-                            ? colors.negative
-                            : colors.textSecondary,
-                      },
-                    ]}
-                  >
-                    {dictationStatus === "recording" ? "■" : "🎙"}
-                  </Text>
-                )}
-              </Pressable>
-            ) : null}
             <TextInput
               ref={ref}
               style={[styles.input, { color: colors.textPrimary }]}
@@ -219,30 +189,76 @@ export const Composer = forwardRef<TextInputInstance, ComposerProps>(
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={
-                streaming ? t("chat.composer.stop") : t("chat.composer.send")
+                action === "stop"
+                  ? t("chat.composer.stop")
+                  : action === "mic"
+                    ? dictationStatus === "transcribing"
+                      ? t("chat.dictation.transcribing")
+                      : dictationStatus === "recording"
+                        ? t("chat.dictation.stop")
+                        : t("chat.dictation.start")
+                    : t("chat.composer.send")
               }
-              accessibilityState={{ disabled: !streaming && !canSend }}
-              disabled={!streaming && !canSend}
-              onPress={streaming ? onStop : onSend}
+              accessibilityState={{
+                disabled:
+                  action === "stop"
+                    ? false
+                    : action === "mic"
+                      ? dictationStatus === "transcribing"
+                      : !canSend,
+                busy: dictationStatus === "transcribing",
+                selected: dictationStatus === "recording",
+              }}
+              disabled={
+                action === "stop"
+                  ? false
+                  : action === "mic"
+                    ? dictationStatus === "transcribing"
+                    : !canSend
+              }
+              onPress={
+                action === "stop"
+                  ? onStop
+                  : action === "mic"
+                    ? onToggleDictation
+                    : onSend
+              }
               style={({ pressed }) => [
                 styles.sendButton,
                 {
-                  backgroundColor: streaming
-                    ? colors.bgTertiary
-                    : canSend
+                  backgroundColor:
+                    action === "send" && canSend
                       ? colors.actionStrong
                       : colors.bgTertiary,
                   opacity: pressed ? 0.82 : 1,
                 },
               ]}
             >
-              {streaming ? (
+              {action === "stop" ? (
                 <View
                   style={[
                     styles.stopSquare,
                     { backgroundColor: colors.textPrimary },
                   ]}
                 />
+              ) : action === "mic" ? (
+                dictationStatus === "transcribing" ? (
+                  <ActivityIndicator size="small" color={colors.textSecondary} />
+                ) : (
+                  <Text
+                    style={[
+                      styles.micGlyph,
+                      {
+                        color:
+                          dictationStatus === "recording"
+                            ? colors.negative
+                            : colors.textSecondary,
+                      },
+                    ]}
+                  >
+                    {dictationStatus === "recording" ? "■" : "🎙"}
+                  </Text>
+                )
               ) : (
                 <Text
                   style={[

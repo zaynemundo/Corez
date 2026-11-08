@@ -16,6 +16,7 @@ the Capacitor shell in `android/` (see [MOBILE.md](./MOBILE.md)) is legacy.
 | Chat persistence: create/list/load conversations, append user + assistant messages, history sheet | Done |
 | Markdown rendering: headings, lists, tables, fenced code with copy, links, inline images | Done |
 | Attachments: camera/gallery/files, R2 upload, vision-shaped API attachments, user-bubble previews | Done |
+| Composer parity with the web: one right-hand action that is the microphone while the input is empty and Send/Stop as soon as there is text (or while streaming) | Done |
 | Voice dictation: expo-audio recording → `/api/transcribe` (Whisper), en/ar language, 120s cap | Done |
 | Chat management: rename, pin/unpin, delete, pinned/recent sections, title header | Done |
 | Offline read cache: SQLite snapshot of the chat list and open conversation, marked as an offline copy | Done |
