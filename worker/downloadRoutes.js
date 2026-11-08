@@ -155,7 +155,7 @@ export async function handleDownload(request, env) {
 
   let status = 200;
   let body = request.method === "HEAD" ? null : object.body;
-  if (object.range && typeof object.range === "object") {
+  if (rangeHeader && object.range && typeof object.range === "object") {
     const start = Number(object.range.offset) || 0;
     const length =
       Number(object.range.length) > 0
