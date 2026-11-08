@@ -320,52 +320,40 @@ export function buildThemeDesign(palette) {
  */
 function buildImageModeTokens({ background, surface, textPrimary, textSecondary, textMuted, tone }) {
   const extreme = tone === "dark" ? "#ffffff" : "#000000";
-  const readable = (text, on, target = 4.5) =>
-    contrastRatio(text, on) >= target;
-  // Body and secondary text must clear AA even on the bare scrimmed picture;
-  // the muted token is tertiary copy (labels, @tokens) and is held to 4:1 there
-  // because a mid-tone cannot reach 4.5 against an arbitrary photo. Every
-  // surface layered above the picture still keeps muted at AA.
-  const allReadable = (on) =>
-    readable(textPrimary, on) &&
-    readable(textSecondary, on) &&
-    readable(textMuted, on, 4);
-  const surfaceReadable = (on) =>
-    readable(textPrimary, on) &&
-    readable(textSecondary, on) &&
-    readable(textMuted, on);
+  // The picture must keep its brightness: the veil below only unifies it with
+  // the palette. Readability comes from the theme-coloured surfaces layered on
+  // top (reading column, sidebar, composer, bubbles), whose opacity is solved
+  // against the worst-case picture behind the veil.
+  const scrimAlpha = 0.22;
+  const scrimmed = mixHex(background, extreme, 1 - scrimAlpha);
 
-  // The picture itself (never the worst-case brightness) is what the chat text
-  // and the translucent surfaces sit on. Raise the scrim until every text token
-  // clears AA against that worst case, so a bright wallpaper cannot wash out a
-  // dark theme (and a black one cannot hide a light theme's labels).
-  let scrimAlpha = 0.45;
-  let scrimmed = mixHex(background, extreme, 1 - scrimAlpha);
-  while (scrimAlpha < 0.96 && !allReadable(scrimmed)) {
-    scrimAlpha = Math.round((scrimAlpha + 0.02) * 100) / 100;
-    scrimmed = mixHex(background, extreme, 1 - scrimAlpha);
-  }
+  const readable = (on) =>
+    contrastRatio(textPrimary, on) >= 4.5 &&
+    contrastRatio(textSecondary, on) >= 4.5 &&
+    contrastRatio(textMuted, on) >= 4.5;
 
-  // Surfaces layered over the scrimmed picture get their own minimum alpha so
-  // text inside them keeps the same guarantee.
-  const surfaceAlphaFor = (baseColor, startAlpha) => {
+  const alphaFor = (baseColor, startAlpha) => {
     let alpha = startAlpha;
     let composite = mixHex(scrimmed, baseColor, alpha);
-    while (alpha < 0.97 && !surfaceReadable(composite)) {
-      alpha = Math.round((alpha + 0.02) * 100) / 100;
+    while (alpha < 0.985 && !readable(composite)) {
+      alpha = Math.round((alpha + 0.015) * 1000) / 1000;
       composite = mixHex(scrimmed, baseColor, alpha);
     }
     return alpha;
   };
 
-  const sidebarAlpha = surfaceAlphaFor(background, 0.72);
-  const bubbleAlpha = surfaceAlphaFor(surface, 0.78);
-  const panelAlpha = surfaceAlphaFor(surface, 0.82);
-  const strongAlpha = surfaceAlphaFor(background, 0.9);
+  // The reading column carries the transcript and the new-chat hero: it is the
+  // main high-opacity surface. Sidebar/composer/bubbles sit above it.
+  const columnAlpha = alphaFor(surface, 0.52);
+  const sidebarAlpha = alphaFor(background, 0.58);
+  const bubbleAlpha = alphaFor(surface, 0.68);
+  const panelAlpha = alphaFor(surface, 0.76);
+  const strongAlpha = alphaFor(background, 0.9);
 
   return {
     scrim: withAlpha(background, scrimAlpha),
     tokens: {
+      "--theme-column-bg": withAlpha(surface, columnAlpha),
       "--theme-sidebar-bg": withAlpha(background, sidebarAlpha),
       "--theme-message-bg": withAlpha(surface, bubbleAlpha),
       "--theme-panel-bg": withAlpha(surface, panelAlpha),

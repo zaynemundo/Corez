@@ -19,6 +19,7 @@ import {
   parseThemeSelection,
   stripControlCharacters,
   themeSelectionValue,
+  toHexColor,
   withAlpha,
 } from "../packages/corez-shared/src/theme/palette.js";
 
@@ -44,6 +45,28 @@ function rgbString(color) {
     b: Number(match[3]),
     a: match[4] === undefined ? 1 : Number(match[4]),
   };
+}
+
+/** The worst-case picture behind the veil for a palette tone. */
+function worstCaseImage(tone) {
+  return tone === "dark" ? "#ffffff" : "#000000";
+}
+
+/** Effective colour of an rgba token over the scrimmed worst-case picture. */
+function compositeOverImage(design, token) {
+  const layer = rgbString(token);
+  expect(layer).toBeTruthy();
+  const scrim = rgbString(design.scrim);
+  const scrimmed = mixHex(
+    design.solid["--bg-primary"],
+    worstCaseImage(design.tone),
+    1 - scrim.a,
+  );
+  return mixHex(
+    scrimmed,
+    toHexColor({ r: layer.r, g: layer.g, b: layer.b }),
+    layer.a,
+  );
 }
 
 describe("colour maths", () => {
@@ -159,6 +182,7 @@ describe("buildThemeDesign", () => {
     ).toBeGreaterThanOrEqual(4.5);
     expect(design.image["--theme-scrim"]).toBe(design.scrim);
     for (const key of [
+      "--theme-column-bg",
       "--theme-sidebar-bg",
       "--theme-message-bg",
       "--theme-panel-bg",
@@ -169,22 +193,25 @@ describe("buildThemeDesign", () => {
     }
   });
 
-  it("keeps text readable over the worst-case image behind the scrim", () => {
+  it("keeps the picture bright and puts AA text on the reading surfaces", () => {
     const design = buildThemeDesign(palette);
     const scrim = rgbString(design.scrim);
     expect(scrim).toBeTruthy();
-    // A dark theme's worst case is a pure-white picture behind the scrim.
-    const composite = mixHex(palette.background, "#ffffff", 1 - scrim.a);
-    expect(
-      contrastRatio(design.solid["--text-primary"], composite),
-    ).toBeGreaterThanOrEqual(4.5);
-    expect(
-      contrastRatio(design.solid["--text-secondary"], composite),
-    ).toBeGreaterThanOrEqual(4.5);
-    // Muted is tertiary copy; over a photograph it is held to 4:1.
-    expect(
-      contrastRatio(design.solid["--text-muted"], composite),
-    ).toBeGreaterThanOrEqual(4);
+    // The veil is deliberately light so the artwork keeps its brightness.
+    expect(scrim.a).toBeLessThanOrEqual(0.3);
+    // Every text-bearing surface resolves to AA against the worst-case picture.
+    for (const token of [
+      design.image["--theme-column-bg"],
+      design.image["--theme-sidebar-bg"],
+      design.image["--theme-message-bg"],
+      design.image["--theme-panel-bg"],
+      design.image["--theme-panel-strong-bg"],
+    ]) {
+      const composite = compositeOverImage(design, token);
+      expect(contrastRatio(design.solid["--text-primary"], composite)).toBeGreaterThanOrEqual(4.5);
+      expect(contrastRatio(design.solid["--text-secondary"], composite)).toBeGreaterThanOrEqual(4.5);
+      expect(contrastRatio(design.solid["--text-muted"], composite)).toBeGreaterThanOrEqual(4.5);
+    }
   });
 
   it("supports light palettes and derives a readable light tone", () => {
@@ -201,19 +228,17 @@ describe("buildThemeDesign", () => {
       contrastRatio(design.solid["--text-primary"], design.solid["--bg-primary"]),
     ).toBeGreaterThanOrEqual(7);
     const scrim = rgbString(design.scrim);
-    const composite = mixHex(light.background, "#000000", 1 - scrim.a);
+    expect(scrim.a).toBeLessThanOrEqual(0.3);
+    const column = compositeOverImage(design, design.image["--theme-column-bg"]);
     expect(
-      contrastRatio(design.solid["--text-primary"], composite),
+      contrastRatio(design.solid["--text-primary"], column),
     ).toBeGreaterThanOrEqual(4.5);
     expect(
-      contrastRatio(design.solid["--text-secondary"], composite),
+      contrastRatio(design.solid["--text-secondary"], column),
     ).toBeGreaterThanOrEqual(4.5);
     expect(
-      contrastRatio(design.solid["--text-muted"], composite),
-    ).toBeGreaterThanOrEqual(4);
-    // A light palette needs a much heavier scrim to keep dark text readable on
-    // a dark picture; that is expected, not a bug.
-    expect(scrim.a).toBeGreaterThan(0.9);
+      contrastRatio(design.solid["--text-muted"], column),
+    ).toBeGreaterThanOrEqual(4.5);
   });
 
   it("refuses a palette that cannot be made readable", () => {

@@ -9780,6 +9780,24 @@ html.theme-has-backgrounds .chat-pane {
   background-color: transparent;
 }
 
+/* Reading surfaces: the picture stays bright around and behind them, while the
+   text sits on the palette-coloured column the theme engine solved for AA
+   contrast. The hero keeps its exact geometry — the vertical padding is
+   cancelled by an equal negative margin, so switching themes never moves it. */
+html.theme-has-backgrounds .messages-inner,
+html.theme-has-backgrounds .new-chat-starters,
+html.theme-has-backgrounds .conversation-persona-footer {
+  background-color: var(--theme-column-bg);
+  border-radius: var(--radius-xl);
+}
+
+html.theme-has-backgrounds .new-chat-hero {
+  background-color: var(--theme-column-bg);
+  border-radius: var(--radius-xl);
+  padding-block: 1rem;
+  margin-block: -1rem 0.2rem;
+}
+
 html.theme-has-backgrounds .sidebar {
   background-color: var(--theme-sidebar-bg);
 }
