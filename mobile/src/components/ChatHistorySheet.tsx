@@ -6,9 +6,10 @@
  * Mutations invalidate the list query so the sheet and the header stay honest.
  */
 import { Feather } from "@expo/vector-icons";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Animated,
   Modal,
   Pressable,
   ScrollView,
@@ -18,6 +19,7 @@ import {
   View,
 } from "react-native";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   deleteChat,
   forgetCachedChat,
@@ -65,6 +67,18 @@ export function ChatHistorySheet({
   const { theme } = useTheme();
   const { t } = useI18n();
   const colors = theme.colors;
+  const insets = useSafeAreaInsets();
+  const [slide] = useState(() => new Animated.Value(-1));
+
+  useEffect(() => {
+    if (!visible) return;
+    slide.setValue(-1);
+    Animated.timing(slide, {
+      toValue: 0,
+      duration: 220,
+      useNativeDriver: true,
+    }).start();
+  }, [slide, visible]);
   const queryClient = useQueryClient();
   const [actionChat, setActionChat] = useState<ChatSummary | null>(null);
   const [actionMode, setActionMode] = useState<ActionMode>(null);
@@ -197,46 +211,66 @@ export function ChatHistorySheet({
         onRequestClose={onClose}
       >
         <View style={[styles.backdrop, { backgroundColor: colors.overlay }]}>
-          <Pressable
-            style={styles.backdropPress}
-            accessibilityLabel={t("common.action.close")}
-            onPress={onClose}
-          />
-          <View
+          <Animated.View
             style={[
               styles.sheet,
-              { backgroundColor: colors.bgPrimary, borderColor: colors.border },
+              {
+                backgroundColor: colors.bgPrimary,
+                borderColor: colors.border,
+                paddingTop: insets.top + 8,
+                paddingBottom: insets.bottom + 10,
+                transform: [
+                  {
+                    translateX: slide.interpolate({
+                      inputRange: [-1, 0],
+                      outputRange: [-380, 0],
+                    }),
+                  },
+                ],
+              },
             ]}
           >
-            <View style={styles.handleRow}>
-              <View
-                style={[styles.handle, { backgroundColor: colors.borderHover }]}
-              />
-            </View>
             <View style={styles.header}>
               <Text style={[styles.title, { color: colors.textPrimary }]}>
                 {t("chat.history.title")}
               </Text>
-              <Pressable
-                accessibilityRole="button"
-                onPress={() => {
-                  onClose();
-                  onNewChat();
-                }}
-                style={({ pressed }) => [
-                  styles.newButton,
-                  {
-                    borderColor: colors.borderHover,
-                    opacity: pressed ? 0.7 : 1,
-                  },
-                ]}
-              >
-                <Text
-                  style={[styles.newButtonLabel, { color: colors.textPrimary }]}
+              <View style={styles.headerActions}>
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => {
+                    onClose();
+                    onNewChat();
+                  }}
+                  style={({ pressed }) => [
+                    styles.newButton,
+                    {
+                      borderColor: colors.borderHover,
+                      opacity: pressed ? 0.7 : 1,
+                    },
+                  ]}
                 >
-                  {t("chat.history.new")}
-                </Text>
-              </Pressable>
+                  <Text
+                    style={[
+                      styles.newButtonLabel,
+                      { color: colors.textPrimary },
+                    ]}
+                  >
+                    {t("chat.history.new")}
+                  </Text>
+                </Pressable>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={t("common.action.close")}
+                  onPress={onClose}
+                  hitSlop={10}
+                  style={[
+                    styles.closeButton,
+                    { backgroundColor: colors.bgTertiary },
+                  ]}
+                >
+                  <Feather name="x" size={16} color={colors.textPrimary} />
+                </Pressable>
+              </View>
             </View>
 
             {chatsQuery.data?.offline ? (
@@ -284,7 +318,12 @@ export function ChatHistorySheet({
                 </>
               )}
             </ScrollView>
-          </View>
+          </Animated.View>
+          <Pressable
+            style={styles.backdropPress}
+            accessibilityLabel={t("common.action.close")}
+            onPress={onClose}
+          />
         </View>
       </Modal>
 
@@ -487,23 +526,35 @@ export function ChatHistorySheet({
 }
 
 const styles = StyleSheet.create({
-  backdrop: { flex: 1, justifyContent: "flex-end" },
+  backdrop: { flex: 1, flexDirection: "row" },
   backdropPress: { flex: 1 },
   sheet: {
-    maxHeight: "72%",
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopLeftRadius: 20,
+    width: "84%",
+    maxWidth: 360,
+    height: "100%",
+    borderRightWidth: StyleSheet.hairlineWidth,
     borderTopRightRadius: 20,
+    borderBottomRightRadius: 20,
     paddingBottom: 18,
   },
-  handleRow: { alignItems: "center", paddingTop: 8, paddingBottom: 4 },
-  handle: { width: 38, height: 4, borderRadius: 2 },
   header: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 18,
+    paddingHorizontal: 16,
     paddingVertical: 10,
+  },
+  headerActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  closeButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: "center",
+    justifyContent: "center",
   },
   title: { fontFamily: "Outfit_600SemiBold", fontSize: 18 },
   newButton: {
