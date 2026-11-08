@@ -172,6 +172,44 @@ export default function ChatMessage({
     );
   };
 
+  // Hex colours typed in prose become inline chips with a live swatch. Code
+  // spans/fences are handled before this splitter, so a colour inside code is
+  // never turned into a chip.
+  const HEX_COLOR_TOKEN =
+    /(?<![\w#])(#[0-9a-fA-F]{6}|#[0-9a-fA-F]{3})(?![\w])/g;
+
+  const renderTextWithColorChips = (text, keyBase) => {
+    if (!text) return null;
+    HEX_COLOR_TOKEN.lastIndex = 0;
+    const pieces = [];
+    let cursor = 0;
+    let match;
+    while ((match = HEX_COLOR_TOKEN.exec(text)) !== null) {
+      if (match.index > cursor) {
+        pieces.push(text.slice(cursor, match.index));
+      }
+      const color = match[1];
+      pieces.push(
+        <span
+          key={`${keyBase}-color-${match.index}`}
+          className="chat-color-chip"
+          title={color}
+        >
+          <span className="chat-color-value">{color}</span>
+          <span
+            className="chat-color-swatch"
+            style={{ backgroundColor: color }}
+            aria-hidden="true"
+          />
+        </span>,
+      );
+      cursor = match.index + match[0].length;
+    }
+    if (cursor === 0) return text;
+    if (cursor < text.length) pieces.push(text.slice(cursor));
+    return pieces;
+  };
+
   const renderInlineFormattedText = (text) => {
     if (!text) return null;
 
@@ -263,7 +301,8 @@ export default function ChatMessage({
       if (token.startsWith("*") && token.endsWith("*") && token.length > 2) {
         return <em key={i}>{renderInlineFormattedText(token.slice(1, -1))}</em>;
       }
-      return token;
+      // Plain prose: chip any hex colours while preserving the text around them.
+      return renderTextWithColorChips(token, i);
     });
   };
 

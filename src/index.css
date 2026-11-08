@@ -2263,6 +2263,44 @@ h6 {
   color: var(--text-primary);
 }
 
+/* A hex colour typed in prose reads as the colour it names: a small code pill
+   with a live swatch at its trailing edge. Code spans and fences are rendered
+   before this splitter, so colours inside code are never chipped. */
+.chat-color-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.32rem;
+  margin-inline: 0.08rem;
+  padding-block: 0.02rem;
+  padding-inline: 0.42rem 0.22rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-pill);
+  background-color: var(--bg-tertiary);
+  color: var(--text-primary);
+  font-family: var(--font-mono, monospace);
+  font-size: 0.82em;
+  line-height: 1.45;
+  vertical-align: baseline;
+  white-space: nowrap;
+}
+
+.chat-color-value {
+  white-space: nowrap;
+  letter-spacing: 0;
+}
+
+.chat-color-swatch {
+  inline-size: 0.95em;
+  block-size: 0.95em;
+  flex: 0 0 auto;
+  border-radius: 3px;
+  border: 1px solid rgba(0, 0, 0, 0.32);
+}
+
+[data-theme="light"] .chat-color-swatch {
+  border-color: rgba(0, 0, 0, 0.38);
+}
+
 /* Beautiful Markdown Tables */
 .markdown-table-wrapper {
   width: 100%;
