@@ -6,6 +6,7 @@
  * Mutations invalidate the list query so the sheet and the header stay honest.
  */
 import { Feather } from "@expo/vector-icons";
+import { router } from "expo-router";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -28,6 +29,7 @@ import {
   setChatPinned,
   type ChatSummary,
 } from "@/api/chats";
+import { useAuth } from "@/state/auth";
 import { useTheme } from "@/state/theme";
 import { useI18n } from "@/i18n";
 import { friendlyError } from "@/lib/errors";
@@ -43,18 +45,6 @@ interface ChatHistorySheetProps {
 
 type ActionMode = "menu" | "rename" | "delete" | null;
 
-function relativeLabel(updatedAt: number, now = Date.now()): string {
-  const diff = Math.max(0, now - (Number(updatedAt) || now));
-  const minutes = Math.floor(diff / 60_000);
-  if (minutes < 1) return "now";
-  if (minutes < 60) return `${minutes}m`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h`;
-  const days = Math.floor(hours / 24);
-  if (days < 7) return `${days}d`;
-  const date = new Date(Number(updatedAt) || now);
-  return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
-}
 
 export function ChatHistorySheet({
   visible,
@@ -84,6 +74,10 @@ export function ChatHistorySheet({
   const [actionMode, setActionMode] = useState<ActionMode>(null);
   const [renameValue, setRenameValue] = useState("");
   const [actionError, setActionError] = useState<string | null>(null);
+  const [pinnedOpen, setPinnedOpen] = useState(false);
+  const [recentOpen, setRecentOpen] = useState(true);
+  const [messagesOpen, setMessagesOpen] = useState(true);
+  const { user } = useAuth();
 
   const chatsQuery = useQuery({
     queryKey: ["chats"],
@@ -130,7 +124,23 @@ export function ChatHistorySheet({
 
   const chats: ChatSummary[] = chatsQuery.data?.chats ?? [];
   const pinned = chats.filter((chat) => Boolean(chat.pinnedAt));
-  const recent = chats.filter((chat) => !chat.pinnedAt);
+  const recentChats = chats.filter(
+    (chat) => !chat.pinnedAt && chat.chatMode !== "conversation",
+  );
+  const messageChats = chats.filter(
+    (chat) => !chat.pinnedAt && chat.chatMode === "conversation",
+  );
+  const emailLocal = String(user?.email || "").split("@")[0] || "";
+  const profileName = emailLocal
+    ? emailLocal
+        .split(".")
+        .map((part) =>
+          part ? part[0].toUpperCase() + part.slice(1) : "",
+        )
+        .join(".")
+    : "Corez";
+  const profileInitials =
+    (emailLocal.slice(0, 2) || "CZ").toUpperCase();
   const busy =
     renameMutation.isPending || pinMutation.isPending || deleteMutation.isPending;
 
@@ -155,7 +165,6 @@ export function ChatHistorySheet({
           styles.row,
           {
             backgroundColor: active ? colors.bgTertiary : "transparent",
-            borderColor: colors.border,
           },
         ]}
       >
@@ -169,24 +178,11 @@ export function ChatHistorySheet({
           onLongPress={() => openMenu(chat)}
           style={styles.rowMain}
         >
-          <View
-            style={[
-              styles.rowIcon,
-              {
-                backgroundColor: active ? colors.bgSecondary : colors.bgTertiary,
-              },
-            ]}
-          >
-            <Feather name="message-square" size={15} color={colors.textSecondary} />
-          </View>
           <Text
             numberOfLines={1}
             style={[styles.rowTitle, { color: colors.textPrimary }]}
           >
             {chat.title || t("chat.history.untitled")}
-          </Text>
-          <Text style={[styles.rowTime, { color: colors.textMuted }]}>
-            {relativeLabel(chat.updatedAt)}
           </Text>
         </Pressable>
         <Pressable
@@ -206,7 +202,7 @@ export function ChatHistorySheet({
     <>
       <Modal
         visible={visible}
-        animationType="slide"
+        animationType="fade"
         transparent
         onRequestClose={onClose}
       >
@@ -230,47 +226,70 @@ export function ChatHistorySheet({
               },
             ]}
           >
-            <View style={styles.header}>
-              <Text style={[styles.title, { color: colors.textPrimary }]}>
-                {t("chat.history.title")}
+            <View style={styles.drawerHeader}>
+              <Text style={[styles.wordmark, { color: colors.textPrimary }]}>
+                COREZ
               </Text>
-              <View style={styles.headerActions}>
-                <Pressable
-                  accessibilityRole="button"
-                  onPress={() => {
-                    onClose();
-                    onNewChat();
-                  }}
-                  style={({ pressed }) => [
-                    styles.newButton,
-                    {
-                      borderColor: colors.borderHover,
-                      opacity: pressed ? 0.7 : 1,
-                    },
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.newButtonLabel,
-                      { color: colors.textPrimary },
-                    ]}
-                  >
-                    {t("chat.history.new")}
-                  </Text>
-                </Pressable>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel={t("common.action.close")}
-                  onPress={onClose}
-                  hitSlop={10}
-                  style={[
-                    styles.closeButton,
-                    { backgroundColor: colors.bgTertiary },
-                  ]}
-                >
-                  <Feather name="x" size={16} color={colors.textPrimary} />
-                </Pressable>
-              </View>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={t("common.action.close")}
+                onPress={onClose}
+                hitSlop={10}
+                style={[styles.iconButton, { backgroundColor: colors.bgTertiary }]}
+              >
+                <Feather name="sidebar" size={16} color={colors.textPrimary} />
+              </Pressable>
+            </View>
+
+            <View style={styles.nav}>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => {
+                  onClose();
+                  onNewChat();
+                }}
+                style={({ pressed }) => [
+                  styles.navItem,
+                  { opacity: pressed ? 0.7 : 1 },
+                ]}
+              >
+                <Feather name="edit-2" size={17} color={colors.textPrimary} />
+                <Text style={[styles.navLabel, { color: colors.textPrimary }]}>
+                  {t("chat.history.new")}
+                </Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => {
+                  onClose();
+                  router.push("/conversation/new");
+                }}
+                style={({ pressed }) => [
+                  styles.navItem,
+                  { opacity: pressed ? 0.7 : 1 },
+                ]}
+              >
+                <Feather name="users" size={17} color={colors.textPrimary} />
+                <Text style={[styles.navLabel, { color: colors.textPrimary }]}>
+                  {t("chat.history.conversation")}
+                </Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => {
+                  onClose();
+                  router.push("/sites");
+                }}
+                style={({ pressed }) => [
+                  styles.navItem,
+                  { opacity: pressed ? 0.7 : 1 },
+                ]}
+              >
+                <Feather name="grid" size={17} color={colors.textPrimary} />
+                <Text style={[styles.navLabel, { color: colors.textPrimary }]}>
+                  {t("chat.history.sites")}
+                </Text>
+              </Pressable>
             </View>
 
             {chatsQuery.data?.offline ? (
@@ -300,24 +319,111 @@ export function ChatHistorySheet({
               ) : (
                 <>
                   {pinned.length > 0 ? (
-                    <Text
-                      style={[styles.sectionLabel, { color: colors.textMuted }]}
-                    >
-                      {t("chat.history.pinned")}
-                    </Text>
+                    <>
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityState={{ expanded: pinnedOpen }}
+                        onPress={() => setPinnedOpen((previous) => !previous)}
+                        style={styles.sectionHeader}
+                      >
+                        <Text
+                          style={[
+                            styles.sectionLabel,
+                            { color: colors.textPrimary },
+                          ]}
+                        >
+                          {t("chat.history.pinned")}
+                        </Text>
+                        <Feather
+                          name={pinnedOpen ? "chevron-down" : "chevron-right"}
+                          size={14}
+                          color={colors.textMuted}
+                        />
+                      </Pressable>
+                      {pinnedOpen ? pinned.map(renderRow) : null}
+                    </>
                   ) : null}
-                  {pinned.map(renderRow)}
-                  {recent.length > 0 && pinned.length > 0 ? (
-                    <Text
-                      style={[styles.sectionLabel, { color: colors.textMuted }]}
-                    >
-                      {t("chat.history.recent")}
-                    </Text>
+                  {recentChats.length > 0 ? (
+                    <>
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityState={{ expanded: recentOpen }}
+                        onPress={() => setRecentOpen((previous) => !previous)}
+                        style={styles.sectionHeader}
+                      >
+                        <Text
+                          style={[
+                            styles.sectionLabel,
+                            { color: colors.textPrimary },
+                          ]}
+                        >
+                          {t("chat.history.recents")}
+                        </Text>
+                        <Feather
+                          name={recentOpen ? "chevron-down" : "chevron-right"}
+                          size={14}
+                          color={colors.textMuted}
+                        />
+                      </Pressable>
+                      {recentOpen ? recentChats.map(renderRow) : null}
+                    </>
                   ) : null}
-                  {recent.map(renderRow)}
+                  {messageChats.length > 0 ? (
+                    <>
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityState={{ expanded: messagesOpen }}
+                        onPress={() => setMessagesOpen((previous) => !previous)}
+                        style={styles.sectionHeader}
+                      >
+                        <Text
+                          style={[
+                            styles.sectionLabel,
+                            { color: colors.textPrimary },
+                          ]}
+                        >
+                          {t("chat.history.messages")}
+                        </Text>
+                        <Feather
+                          name={messagesOpen ? "chevron-down" : "chevron-right"}
+                          size={14}
+                          color={colors.textMuted}
+                        />
+                      </Pressable>
+                      {messagesOpen ? messageChats.map(renderRow) : null}
+                    </>
+                  ) : null}
                 </>
               )}
             </ScrollView>
+
+            <View style={[styles.footer, { borderTopColor: colors.border }]}>
+              <View
+                style={[styles.avatar, { backgroundColor: colors.bgTertiary }]}
+              >
+                <Text style={[styles.avatarText, { color: colors.textPrimary }]}>
+                  {profileInitials}
+                </Text>
+              </View>
+              <Text
+                numberOfLines={1}
+                style={[styles.profileName, { color: colors.textPrimary }]}
+              >
+                {profileName}
+              </Text>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={t("shell.settings")}
+                onPress={() => {
+                  onClose();
+                  router.push("/settings");
+                }}
+                hitSlop={8}
+                style={styles.footerGear}
+              >
+                <Feather name="settings" size={18} color={colors.textSecondary} />
+              </Pressable>
+            </View>
           </Animated.View>
           <Pressable
             style={styles.backdropPress}
@@ -537,26 +643,78 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: 20,
     paddingBottom: 18,
   },
-  header: {
+  drawerHeader: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingVertical: 8,
   },
-  headerActions: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
+  wordmark: {
+    fontFamily: "Outfit_700Bold",
+    fontSize: 20,
+    letterSpacing: 4,
   },
-  closeButton: {
+  iconButton: {
     width: 34,
     height: 34,
     borderRadius: 17,
     alignItems: "center",
     justifyContent: "center",
   },
-  title: { fontFamily: "Outfit_600SemiBold", fontSize: 18 },
+  nav: {
+    paddingHorizontal: 8,
+    paddingTop: 6,
+    paddingBottom: 10,
+    gap: 2,
+  },
+  navItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    minHeight: 46,
+    borderRadius: 10,
+    paddingHorizontal: 10,
+  },
+  navLabel: {
+    fontSize: 14.5,
+    fontWeight: "500",
+  },
+  sectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingTop: 14,
+    paddingBottom: 6,
+  },
+  sectionLabel: {
+    fontSize: 14.5,
+    fontWeight: "600",
+  },
+  footer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: 14,
+    paddingTop: 12,
+  },
+  avatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  avatarText: { fontSize: 13, fontWeight: "700" },
+  profileName: { flex: 1, fontSize: 14.5, fontWeight: "600" },
+  footerGear: {
+    width: 38,
+    height: 38,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   newButton: {
     borderWidth: 1,
     borderRadius: 9999,
@@ -565,21 +723,12 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   newButtonLabel: { fontSize: 12.5, fontWeight: "600" },
-  list: { paddingHorizontal: 12, paddingBottom: 10, gap: 2 },
-  sectionLabel: {
-    fontSize: 10.5,
-    fontWeight: "700",
-    letterSpacing: 0.08,
-    textTransform: "uppercase",
-    paddingHorizontal: 10,
-    paddingTop: 10,
-    paddingBottom: 4,
-  },
+  list: { paddingHorizontal: 8, paddingBottom: 8, gap: 1 },
+
   row: {
     flexDirection: "row",
     alignItems: "center",
-    borderRadius: 12,
-    marginBottom: 2,
+    borderRadius: 10,
   },
   rowMain: {
     flex: 1,
@@ -590,15 +739,7 @@ const styles = StyleSheet.create({
     paddingLeft: 8,
     paddingRight: 4,
   },
-  rowIcon: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    alignItems: "center",
-    justifyContent: "center",
-  },
   rowTitle: { flex: 1, fontSize: 14.5 },
-  rowTime: { fontSize: 11.5 },
   moreButton: {
     width: 44,
     minHeight: 48,
