@@ -342,9 +342,9 @@ function buildImageModeTokens({ background, surface, textPrimary, textSecondary,
     return alpha;
   };
 
-  // The reading column carries the new-chat setup copy and conversation footer;
-  // the conversation transcript and the new-chat question intentionally sit
-  // directly on the artwork. Sidebar, composer and bubbles are their own
+  // The reading column carries the conversation-mode footer; the conversation
+  // transcript, the new-chat question and the new-chat starters intentionally
+  // sit directly on the artwork. Sidebar, composer and bubbles are their own
   // surfaces above the picture.
   const columnAlpha = alphaFor(surface, 0.52);
   const sidebarAlpha = alphaFor(background, 0.58);

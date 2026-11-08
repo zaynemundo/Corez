@@ -9785,7 +9785,6 @@ html.theme-has-backgrounds .chat-pane {
    palette-coloured reading surface the theme engine solved for AA contrast.
    The hero keeps its exact geometry — the vertical padding is cancelled by an
    equal negative margin, so switching themes never moves it. */
-html.theme-has-backgrounds .new-chat-starters,
 html.theme-has-backgrounds .conversation-persona-footer {
   background-color: var(--theme-column-bg);
   border-radius: var(--radius-xl);

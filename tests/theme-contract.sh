@@ -175,7 +175,7 @@ check_block_property 'main content lets the picture through' 'html.theme-has-bac
 check_block_property 'chat pane lets the picture through' 'html.theme-has-backgrounds .chat-pane' 'background-color' 'transparent'
 check_absent 'the conversation transcript stays on the artwork (no column panel)' 'html\.theme-has-backgrounds \.messages-inner'
 check_absent 'the new chat question stays on the artwork (no column panel)' 'html\.theme-has-backgrounds \.new-chat-hero'
-check_block_property 'new chat starters sit on the reading column' 'html.theme-has-backgrounds .new-chat-starters' 'background-color' 'var(--theme-column-bg)'
+check_absent 'the new chat starters stay on the artwork (no column panel)' 'html\.theme-has-backgrounds \.new-chat-starters'
 check_block_property 'conversation footer sits on the reading column' 'html.theme-has-backgrounds .conversation-persona-footer' 'background-color' 'var(--theme-column-bg)'
 check_block_property 'sidebar uses the theme panel token' 'html.theme-has-backgrounds .sidebar' 'background-color' 'var(--theme-sidebar-bg)'
 check_block_property 'user bubbles use the theme bubble token' 'html.theme-has-backgrounds .message-wrapper.user .message-content' 'background-color' 'var(--theme-message-bg)'
