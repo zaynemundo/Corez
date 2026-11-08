@@ -9791,13 +9791,6 @@ html.theme-has-backgrounds .conversation-persona-footer {
   border-radius: var(--radius-xl);
 }
 
-html.theme-has-backgrounds .new-chat-hero {
-  background-color: var(--theme-column-bg);
-  border-radius: var(--radius-xl);
-  padding-block: 1rem;
-  margin-block: -1rem 0.2rem;
-}
-
 html.theme-has-backgrounds .sidebar {
   background-color: var(--theme-sidebar-bg);
 }
