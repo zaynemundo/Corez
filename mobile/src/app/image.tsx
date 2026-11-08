@@ -17,6 +17,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { Feather } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { SessionGate } from "@/components/SessionGate";
 import { generateImage, IMAGE_STYLES, type GeneratedImage } from "@/api/images";
@@ -99,7 +100,7 @@ function ImageStudio() {
           hitSlop={12}
           style={styles.headerButton}
         >
-          <Text style={{ color: colors.textPrimary, fontSize: 22 }}>‹</Text>
+          <Feather name="chevron-left" size={22} color={colors.textPrimary} />
         </Pressable>
         <Text style={[styles.title, { color: colors.textPrimary }]}>
           {t("image.title")}

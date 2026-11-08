@@ -6,6 +6,7 @@
  * line once the answer starts, and never invents reasoning that was not sent.
  * Mirrors src/components/ThinkingPanel.jsx.
  */
+import { Feather } from "@expo/vector-icons";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useTheme } from "@/state/theme";
 import { useI18n } from "@/i18n";
@@ -77,9 +78,11 @@ export function ThinkingPanel({
         >
           {title}
         </Text>
-        <Text style={[styles.chevron, { color: colors.textMuted }]}>
-          {expanded ? "⌄" : "›"}
-        </Text>
+        <Feather
+          name={expanded ? "chevron-down" : "chevron-right"}
+          size={16}
+          color={colors.textMuted}
+        />
       </Pressable>
       {expanded ? (
         <View style={styles.body}>

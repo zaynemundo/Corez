@@ -16,6 +16,7 @@ import {
   Text,
   View,
 } from "react-native";
+import { Feather } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useQuery } from "@tanstack/react-query";
 import { SessionGate } from "@/components/SessionGate";
@@ -79,7 +80,7 @@ function SiteAnalyticsView() {
           hitSlop={12}
           style={styles.backButton}
         >
-          <Text style={{ color: colors.textPrimary, fontSize: 22 }}>‹</Text>
+          <Feather name="chevron-left" size={22} color={colors.textPrimary} />
         </Pressable>
         <Text numberOfLines={1} style={[styles.title, { color: colors.textPrimary }]}>
           {data?.title || slug || t("analytics.title")}

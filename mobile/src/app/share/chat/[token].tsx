@@ -18,6 +18,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useQuery } from "@tanstack/react-query";
+import { Feather } from "@expo/vector-icons";
 import { getSharedChat } from "@/api/shareChat";
 import { MarkdownView } from "@/components/MarkdownView";
 import { friendlyError } from "@/lib/errors";
@@ -61,7 +62,7 @@ export default function SharedChatScreen() {
           hitSlop={12}
           style={styles.headerButton}
         >
-          <Text style={{ color: colors.textPrimary, fontSize: 22 }}>‹</Text>
+          <Feather name="chevron-left" size={22} color={colors.textPrimary} />
         </Pressable>
         <Text numberOfLines={1} style={[styles.title, { color: colors.textPrimary }]}>
           {t("shareChat.title")}
@@ -76,7 +77,7 @@ export default function SharedChatScreen() {
           hitSlop={12}
           style={styles.headerButton}
         >
-          <Text style={{ color: colors.textMuted, fontSize: 18 }}>↗</Text>
+          <Feather name="share-2" size={18} color={colors.textMuted} />
         </Pressable>
       </View>
 

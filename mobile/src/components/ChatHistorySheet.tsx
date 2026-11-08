@@ -5,6 +5,7 @@
  * held above recents, and each row can be renamed, pinned/unpinned or deleted.
  * Mutations invalidate the list query so the sheet and the header stay honest.
  */
+import { Feather } from "@expo/vector-icons";
 import { useState } from "react";
 import {
   ActivityIndicator,
@@ -171,7 +172,7 @@ export function ChatHistorySheet({
           hitSlop={8}
           style={styles.moreButton}
         >
-          <Text style={{ color: colors.textMuted, fontSize: 18 }}>⋯</Text>
+          <Feather name="more-horizontal" size={18} color={colors.textMuted} />
         </Pressable>
       </View>
     );

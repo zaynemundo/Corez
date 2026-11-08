@@ -4,6 +4,7 @@
  * Provides the two actions the web's image viewer has: native share/save via
  * the share sheet, and copy the absolute image URL.
  */
+import { Feather } from "@expo/vector-icons";
 import { useContext, useState } from "react";
 import {
   ActivityIndicator,
@@ -90,7 +91,7 @@ export function ImageFullscreenModal({
             hitSlop={12}
             style={styles.closeButton}
           >
-            <Text style={styles.closeGlyph}>×</Text>
+            <Feather name="x" size={26} color="#f0f0f0" />
           </Pressable>
         </View>
         <View

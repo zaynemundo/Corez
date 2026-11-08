@@ -20,6 +20,7 @@ import {
   type ScrollViewInstance,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Feather } from "@expo/vector-icons";
 import { Composer } from "@/components/Composer";
 import {
   MessageBubble,
@@ -503,7 +504,7 @@ export function ChatView({ initialChatId }: ChatViewProps) {
           hitSlop={12}
           style={styles.headerButton}
         >
-          <Text style={{ color: colors.textPrimary, fontSize: 18 }}>☰</Text>
+          <Feather name="menu" size={20} color={colors.textPrimary} />
         </Pressable>
         <View style={styles.headerText}>
           <Text style={[styles.brand, { color: colors.textPrimary }]}>COREZ</Text>
@@ -532,7 +533,7 @@ export function ChatView({ initialChatId }: ChatViewProps) {
             {sharingChat ? (
               <ActivityIndicator size="small" color={colors.textSecondary} />
             ) : (
-              <Text style={{ color: colors.textSecondary, fontSize: 18 }}>↗</Text>
+              <Feather name="share-2" size={18} color={colors.textSecondary} />
             )}
           </Pressable>
           <Pressable
@@ -542,8 +543,7 @@ export function ChatView({ initialChatId }: ChatViewProps) {
             hitSlop={12}
             style={styles.headerButton}
           >
-            <Text style={{ color: colors.textSecondary, fontSize: 20 }}>⚙</Text>
-          </Pressable>
+            <Feather name="settings" size={19} color={colors.textSecondary} />          </Pressable>
         </View>
       </View>
 

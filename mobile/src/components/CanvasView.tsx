@@ -5,6 +5,7 @@
  * the artifact is rendered in a WebView. The source stays native: Copy and
  * Share/Save act on the HTML string, never on the sandboxed page.
  */
+import { Feather } from "@expo/vector-icons";
 import { useContext, useState } from "react";
 import {
   ActivityIndicator,
@@ -171,9 +172,7 @@ export function CanvasView({ html, onClose }: CanvasViewProps) {
               hitSlop={10}
               style={styles.action}
             >
-              <Text style={[styles.closeGlyph, { color: colors.textPrimary }]}>
-                ×
-              </Text>
+              <Feather name="x" size={24} color={colors.textPrimary} />
             </Pressable>
           </View>
         </View>

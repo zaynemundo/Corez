@@ -23,6 +23,7 @@
     "@corez_ai/shared": "file:../packages/corez-shared",
     "@expo-google-fonts/jetbrains-mono": "0.4.1",
     "@expo-google-fonts/outfit": "0.4.3",
+    "@expo/vector-icons": "^15.0.2",
     "@shopify/flash-list": "2.3.2",
     "@tanstack/react-query": "5.107.1",
     "expo": "~58.0.23",

@@ -6,6 +6,7 @@
  * land in Phase 1; the layout here is already the final one.
  */
 import { Image, StyleSheet, Text, View } from "react-native";
+import { Feather } from "@expo/vector-icons";
 import { ThinkingPanel } from "./ThinkingPanel";
 import { MarkdownView } from "./MarkdownView";
 import { useTheme } from "@/state/theme";
@@ -93,6 +94,11 @@ export function MessageBubble({
                         },
                       ]}
                     >
+                      <Feather
+                        name="file-text"
+                        size={13}
+                        color={colors.textSecondary}
+                      />
                       <Text
                         numberOfLines={1}
                         style={[
@@ -100,7 +106,7 @@ export function MessageBubble({
                           { color: colors.textSecondary },
                         ]}
                       >
-                        📄 {attachment.name}
+                        {attachment.name}
                       </Text>
                     </View>
                   )}
@@ -179,13 +185,16 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
   },
   attachmentFile: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
     borderWidth: StyleSheet.hairlineWidth,
     borderRadius: 8,
     paddingHorizontal: 8,
     paddingVertical: 6,
     maxWidth: 180,
   },
-  attachmentFileName: { fontSize: 12 },
+  attachmentFileName: { fontSize: 12, flexShrink: 1 },
   assistantRow: {
     marginBottom: 22,
     paddingHorizontal: 16,

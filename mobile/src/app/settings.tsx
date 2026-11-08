@@ -6,6 +6,7 @@
  */
 import { router } from "expo-router";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Feather } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Constants from "expo-constants";
 import { SessionGate } from "@/components/SessionGate";
@@ -54,7 +55,7 @@ function SettingsView() {
           hitSlop={12}
           style={styles.backButton}
         >
-          <Text style={{ color: colors.textPrimary, fontSize: 22 }}>‹</Text>
+          <Feather name="chevron-left" size={22} color={colors.textPrimary} />
         </Pressable>
         <Text style={[styles.title, { color: colors.textPrimary }]}>
           {t("shell.settings")}
@@ -87,7 +88,7 @@ function SettingsView() {
           <Text style={[styles.sitesRowLabel, { color: colors.textPrimary }]}>
             {t("image.title")}
           </Text>
-          <Text style={{ color: colors.textMuted, fontSize: 18 }}>›</Text>
+          <Feather name="chevron-right" size={18} color={colors.textMuted} />
         </Pressable>
 
         <Pressable
@@ -105,7 +106,7 @@ function SettingsView() {
           <Text style={[styles.sitesRowLabel, { color: colors.textPrimary }]}>
             {t("sites.title")}
           </Text>
-          <Text style={{ color: colors.textMuted, fontSize: 18 }}>›</Text>
+          <Feather name="chevron-right" size={18} color={colors.textMuted} />
         </Pressable>
 
         <Section title={t("settings.theme")}>

@@ -18,6 +18,7 @@ import {
   View,
   type TextInputInstance,
 } from "react-native";
+import { Feather } from "@expo/vector-icons";
 import { useTheme } from "@/state/theme";
 import { useI18n } from "@/i18n";
 import type { Attachment, AttachmentSource } from "@/lib/attachments";
@@ -111,7 +112,12 @@ export const Composer = forwardRef<TextInputInstance, ComposerProps>(
                       resizeMode="cover"
                     />
                   ) : (
-                    <Text style={styles.fileGlyph}>📄</Text>
+                    <Feather
+                      name="file-text"
+                      size={16}
+                      color={colors.textMuted}
+                      style={styles.fileGlyph}
+                    />
                   )}
                   <Text
                     numberOfLines={1}
@@ -125,9 +131,7 @@ export const Composer = forwardRef<TextInputInstance, ComposerProps>(
                     hitSlop={8}
                     onPress={() => onRemoveAttachment?.(attachment.id)}
                   >
-                    <Text style={[styles.chipRemove, { color: colors.textMuted }]}>
-                      ×
-                    </Text>
+                    <Feather name="x" size={14} color={colors.textMuted} />
                   </Pressable>
                 </View>
               ))}
@@ -166,9 +170,11 @@ export const Composer = forwardRef<TextInputInstance, ComposerProps>(
                 {attachmentBusy ? (
                   <ActivityIndicator size="small" color={colors.textSecondary} />
                 ) : (
-                  <Text style={[styles.attachGlyph, { color: colors.textSecondary }]}>
-                    +
-                  </Text>
+                  <Feather
+                    name="plus"
+                    size={22}
+                    color={colors.textSecondary}
+                  />
                 )}
               </Pressable>
             ) : null}
@@ -245,33 +251,24 @@ export const Composer = forwardRef<TextInputInstance, ComposerProps>(
                 dictationStatus === "transcribing" ? (
                   <ActivityIndicator size="small" color={colors.textSecondary} />
                 ) : (
-                  <Text
-                    style={[
-                      styles.micGlyph,
-                      {
-                        color:
-                          dictationStatus === "recording"
-                            ? colors.negative
-                            : colors.textSecondary,
-                      },
-                    ]}
-                  >
-                    {dictationStatus === "recording" ? "■" : "🎙"}
-                  </Text>
+                  <Feather
+                    name={dictationStatus === "recording" ? "mic-off" : "mic"}
+                    size={20}
+                    color={
+                      dictationStatus === "recording"
+                        ? colors.negative
+                        : colors.textSecondary
+                    }
+                  />
                 )
               ) : (
-                <Text
-                  style={[
-                    styles.sendGlyph,
-                    {
-                      color: canSend
-                        ? colors.actionStrongContrast
-                        : colors.textMuted,
-                    },
-                  ]}
-                >
-                  ↑
-                </Text>
+                <Feather
+                  name="arrow-up"
+                  size={20}
+                  color={
+                    canSend ? colors.actionStrongContrast : colors.textMuted
+                  }
+                />
               )}
             </Pressable>
           </View>
@@ -296,11 +293,11 @@ export const Composer = forwardRef<TextInputInstance, ComposerProps>(
             >
               {(
                 [
-                  ["camera", t("chat.attachments.camera"), "📷"],
-                  ["library", t("chat.attachments.photos"), "🖼"],
-                  ["file", t("chat.attachments.file"), "📎"],
+                  ["camera", t("chat.attachments.camera"), "camera"],
+                  ["library", t("chat.attachments.photos"), "image"],
+                  ["file", t("chat.attachments.file"), "paperclip"],
                 ] as const
-              ).map(([source, label, glyph]) => (
+              ).map(([source, label, icon]) => (
                 <Pressable
                   key={source}
                   accessibilityRole="button"
@@ -310,7 +307,12 @@ export const Composer = forwardRef<TextInputInstance, ComposerProps>(
                     { borderColor: colors.border, opacity: pressed ? 0.65 : 1 },
                   ]}
                 >
-                  <Text style={styles.menuGlyph}>{glyph}</Text>
+                  <Feather
+                    name={icon}
+                    size={18}
+                    color={colors.textSecondary}
+                    style={styles.menuGlyph}
+                  />
                   <Text style={[styles.menuLabel, { color: colors.textPrimary }]}>
                     {label}
                   </Text>
@@ -339,7 +341,7 @@ const styles = StyleSheet.create({
     maxWidth: 240,
   },
   thumb: { width: 28, height: 28, borderRadius: 14 },
-  fileGlyph: { fontSize: 16, marginLeft: 4 },
+  fileGlyph: { marginLeft: 4 },
   chipName: { flexShrink: 1, fontSize: 12 },
   chipRemove: { fontSize: 16, lineHeight: 18 },
   error: { fontSize: 12, paddingHorizontal: 6 },
@@ -363,7 +365,6 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   attachGlyph: { fontSize: 24, lineHeight: 26, fontWeight: "400" },
-  micGlyph: { fontSize: 19, lineHeight: 22 },
   input: {
     flex: 1,
     fontSize: 15,
@@ -381,8 +382,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     marginBottom: 2,
   },
-  sendGlyph: { fontSize: 20, lineHeight: 22, fontWeight: "600" },
   stopSquare: { width: 12, height: 12, borderRadius: 2 },
+  sendGlyph: { fontSize: 20, lineHeight: 22, fontWeight: "600" },
   menuBackdrop: {
     flex: 1,
     justifyContent: "flex-end",

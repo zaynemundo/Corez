@@ -19,6 +19,7 @@ import {
   Text,
   View,
 } from "react-native";
+import { Feather } from "@expo/vector-icons";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { SessionGate } from "@/components/SessionGate";
@@ -104,7 +105,7 @@ function SitesView() {
           hitSlop={12}
           style={styles.backButton}
         >
-          <Text style={{ color: colors.textPrimary, fontSize: 22 }}>‹</Text>
+          <Feather name="chevron-left" size={22} color={colors.textPrimary} />
         </Pressable>
         <Text style={[styles.title, { color: colors.textPrimary }]}>
           {t("sites.title")}
