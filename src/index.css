@@ -2269,17 +2269,16 @@ h6 {
 .chat-color-chip {
   display: inline-flex;
   align-items: center;
-  gap: 0.32rem;
-  margin-inline: 0.08rem;
-  padding-block: 0.02rem;
-  padding-inline: 0.42rem 0.22rem;
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-pill);
-  background-color: var(--bg-tertiary);
-  color: var(--text-primary);
+  gap: 0.3rem;
+  margin-inline: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  color: inherit;
   font-family: var(--font-mono, monospace);
-  font-size: 0.82em;
-  line-height: 1.45;
+  font-size: 0.9em;
+  line-height: inherit;
   vertical-align: baseline;
   white-space: nowrap;
 }
