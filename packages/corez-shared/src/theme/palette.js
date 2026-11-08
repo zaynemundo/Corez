@@ -342,8 +342,9 @@ function buildImageModeTokens({ background, surface, textPrimary, textSecondary,
     return alpha;
   };
 
-  // The reading column carries the transcript and the new-chat hero: it is the
-  // main high-opacity surface. Sidebar/composer/bubbles sit above it.
+  // The reading column carries the new-chat hero/setup copy; the conversation
+  // transcript intentionally sits directly on the artwork. Sidebar, composer
+  // and bubbles are their own surfaces above the picture.
   const columnAlpha = alphaFor(surface, 0.52);
   const sidebarAlpha = alphaFor(background, 0.58);
   const bubbleAlpha = alphaFor(surface, 0.68);

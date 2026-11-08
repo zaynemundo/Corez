@@ -173,7 +173,7 @@ fi
 check_block_property 'app shell lets the picture through' 'html.theme-has-backgrounds .app-container' 'background-color' 'transparent'
 check_block_property 'main content lets the picture through' 'html.theme-has-backgrounds .main-content' 'background-color' 'transparent'
 check_block_property 'chat pane lets the picture through' 'html.theme-has-backgrounds .chat-pane' 'background-color' 'transparent'
-check_block_property 'reading column uses the theme column token' 'html.theme-has-backgrounds .messages-inner' 'background-color' 'var(--theme-column-bg)'
+check_absent 'the conversation transcript stays on the artwork (no column panel)' 'html\.theme-has-backgrounds \.messages-inner'
 check_block_property 'new chat question sits on the reading column' 'html.theme-has-backgrounds .new-chat-hero' 'background-color' 'var(--theme-column-bg)'
 check_block_property 'new chat starters sit on the reading column' 'html.theme-has-backgrounds .new-chat-starters' 'background-color' 'var(--theme-column-bg)'
 check_block_property 'conversation footer sits on the reading column' 'html.theme-has-backgrounds .conversation-persona-footer' 'background-color' 'var(--theme-column-bg)'
