@@ -343,10 +343,14 @@ function buildImageModeTokens({ background, surface, textPrimary, textSecondary,
   };
 
   // The reading column carries the conversation-mode footer; the conversation
-  // transcript, the new-chat question, the new-chat starters and the sidebar
-  // intentionally sit directly on the artwork. Composer and bubbles are their
-  // own surfaces above the picture.
+  // transcript, the new-chat question and the new-chat starters intentionally
+  // sit directly on the artwork. The sidebar keeps a light 30%-opacity tint
+  // (70% transparent) so it reads as a surface without hiding the picture.
+  // Composer and bubbles are their own surfaces above the picture.
   const columnAlpha = alphaFor(surface, 0.52);
+  // 70% transparent: the picture shows through, but the column still reads as
+  // a single surface instead of text floating on the wallpaper.
+  const sidebarAlpha = 0.3;
   const bubbleAlpha = alphaFor(surface, 0.68);
   const panelAlpha = alphaFor(surface, 0.76);
   const strongAlpha = alphaFor(background, 0.9);
@@ -355,6 +359,7 @@ function buildImageModeTokens({ background, surface, textPrimary, textSecondary,
     scrim: withAlpha(background, scrimAlpha),
     tokens: {
       "--theme-column-bg": withAlpha(surface, columnAlpha),
+      "--theme-sidebar-bg": withAlpha(background, sidebarAlpha),
       "--theme-message-bg": withAlpha(surface, bubbleAlpha),
       "--theme-panel-bg": withAlpha(surface, panelAlpha),
       "--theme-panel-strong-bg": withAlpha(background, strongAlpha),

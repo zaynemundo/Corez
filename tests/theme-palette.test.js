@@ -183,6 +183,7 @@ describe("buildThemeDesign", () => {
     expect(design.image["--theme-scrim"]).toBe(design.scrim);
     for (const key of [
       "--theme-column-bg",
+      "--theme-sidebar-bg",
       "--theme-message-bg",
       "--theme-panel-bg",
       "--theme-panel-strong-bg",
@@ -199,6 +200,11 @@ describe("buildThemeDesign", () => {
     // The veil is deliberately light so the artwork keeps its brightness.
     expect(scrim.a).toBeLessThanOrEqual(0.3);
     // Every text-bearing surface resolves to AA against the worst-case picture.
+    // The sidebar is a deliberate 70%-transparent panel, not an AA surface.
+    const sidebar = rgbString(design.image["--theme-sidebar-bg"]);
+    expect(sidebar).toBeTruthy();
+    expect(sidebar.a).toBeGreaterThanOrEqual(0.25);
+    expect(sidebar.a).toBeLessThanOrEqual(0.35);
     for (const token of [
       design.image["--theme-column-bg"],
       design.image["--theme-message-bg"],

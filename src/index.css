@@ -9790,15 +9790,19 @@ html.theme-has-backgrounds .conversation-persona-footer {
   border-radius: var(--radius-xl);
 }
 
-/* The sidebar is part of the artwork canvas: its panel and both inner
-   containers drop their fills so the wallpaper runs edge to edge, the hairline
-   edge disappears, and the phone drawer's dimming scrim is removed so the
-   drawer is genuinely see-through instead of a darker copy of the picture. */
-html.theme-has-backgrounds .sidebar,
+/* The sidebar sits on the artwork with a light 70%-transparent tint: the
+   picture is visible through it, but the nav column still reads as one surface.
+   Only the outer column is tinted (the stacked inner containers stay clear, so
+   the tint is not doubled); the hairline edge and the phone drawer's dimming
+   scrim are removed so nothing darkens the artwork behind it. */
+html.theme-has-backgrounds .sidebar {
+  background-color: var(--theme-sidebar-bg);
+  border-right-color: transparent;
+}
+
 html.theme-has-backgrounds .sidebar-full,
 html.theme-has-backgrounds .sidebar-rail {
   background-color: transparent;
-  border-right-color: transparent;
 }
 
 html.theme-has-backgrounds .sidebar-backdrop {
