@@ -180,6 +180,8 @@ check_block_property 'conversation footer sits on the reading column' 'html.them
 check_block_property 'the sidebar lets the picture through' 'html.theme-has-backgrounds .sidebar' 'background-color' 'transparent'
 check_block_property 'the expanded sidebar panel lets the picture through' 'html.theme-has-backgrounds .sidebar-full' 'background-color' 'transparent'
 check_block_property 'the collapsed sidebar rail lets the picture through' 'html.theme-has-backgrounds .sidebar-rail' 'background-color' 'transparent'
+check_block_property 'the sidebar edge disappears on the artwork' 'html.theme-has-backgrounds .sidebar' 'border-right-color' 'transparent'
+check_block_property 'the phone drawer scrim lets the picture through' 'html.theme-has-backgrounds .sidebar-backdrop' 'background' 'transparent'
 check_block_property 'user bubbles use the theme bubble token' 'html.theme-has-backgrounds .message-wrapper.user .message-content' 'background-color' 'var(--theme-message-bg)'
 check_block_property 'composer uses the theme panel token' 'html.theme-has-backgrounds .input-box' 'background-color' 'var(--theme-panel-bg)'
 check_block_property 'dialogs keep a readable panel surface' 'html.theme-has-backgrounds .modal-card' 'background-color' 'var(--theme-panel-strong-bg)'

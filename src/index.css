@@ -9791,11 +9791,18 @@ html.theme-has-backgrounds .conversation-persona-footer {
 }
 
 /* The sidebar is part of the artwork canvas: its panel and both inner
-   containers drop their fills so the wallpaper runs edge to edge. */
+   containers drop their fills so the wallpaper runs edge to edge, the hairline
+   edge disappears, and the phone drawer's dimming scrim is removed so the
+   drawer is genuinely see-through instead of a darker copy of the picture. */
 html.theme-has-backgrounds .sidebar,
 html.theme-has-backgrounds .sidebar-full,
 html.theme-has-backgrounds .sidebar-rail {
   background-color: transparent;
+  border-right-color: transparent;
+}
+
+html.theme-has-backgrounds .sidebar-backdrop {
+  background: transparent;
 }
 
 html.theme-has-backgrounds .message-wrapper.user .message-content,
