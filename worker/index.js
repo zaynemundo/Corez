@@ -52,6 +52,7 @@ import {
 } from "./resumeThinking.js";
 import { handleR2Assets, handleR2Apps } from "./r2Routes.js";
 import { handlePublish } from "./publishRoutes.js";
+import { handleDownload } from "./downloadRoutes.js";
 import {
   handleTitleFastPath,
   tryGreetingOrIdentityFastPath,
@@ -644,6 +645,14 @@ export default {
     }
 
     const pathname = new URL(request.url).pathname;
+    if (
+      pathname === "/download" ||
+      pathname === "/download/" ||
+      pathname === "/download/corez.apk" ||
+      pathname === "/download/apk"
+    ) {
+      return handleDownload(request, env);
+    }
     if (pathname === "/.well-known/assetlinks.json" && request.method === "GET") {
       return new Response(JSON.stringify(buildAndroidAssetLinks(env)), {
         status: 200,
