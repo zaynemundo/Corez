@@ -34,6 +34,7 @@ import { handleZiina } from "./ziina.js";
 import { handleSubscriptions } from "./subscriptions.js";
 import { handleAnalytics } from "./analytics.js";
 import { pruneSiteAnalytics } from "./siteAnalytics.js";
+import { handleThemes, pruneThemeProposals } from "./themeRoutes.js";
 export { GameRoom } from "./gameRoom.js";
 
 // Per-client AI request rate bound: paid provider tokens are spent on every
@@ -234,6 +235,17 @@ export default {
       if (projectsRes) return withDirectAiCors(projectsRes);
     }
 
+    // User-designed themes (see worker/themeRoutes.js). Same pre-gate placement
+    // as chats/projects: the handler authorises with its own session check so a
+    // missing AUTH_SECRET follows the chats failure shape.
+    if (
+      url.pathname === "/api/themes" ||
+      url.pathname.startsWith("/api/themes/")
+    ) {
+      const themesRes = await handleThemes(request, env);
+      if (themesRes) return withDirectAiCors(themesRes);
+    }
+
     // Auth gate - protect AI and app APIs. Published creations (/api/publish
     // output at /<slug> and their referenced assets at /api/assets/<key>) must
     // stay OPEN to anonymous visitors so share links render for everyone. The
@@ -251,6 +263,7 @@ export default {
       "/api/apps",
       "/api/memory",
       "/api/projects",
+      "/api/themes",
       "/api/publish",
       "/api/assets",
       "/api/chats",
@@ -474,6 +487,13 @@ export default {
       if (new Date(scheduledAt).getUTCHours() === 3) {
         try {
           await pruneSiteAnalytics(env, scheduledAt);
+        } catch {
+          // The next trigger retries; a failed prune never blocks the sweep.
+        }
+        try {
+          // Expired theme proposals keep their preview images until this runs,
+          // so storage is bounded even when the user never picks an option.
+          await pruneThemeProposals(env, scheduledAt);
         } catch {
           // The next trigger retries; a failed prune never blocks the sweep.
         }

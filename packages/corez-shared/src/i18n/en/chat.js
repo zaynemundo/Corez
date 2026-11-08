@@ -33,6 +33,7 @@ export default {
       game: "Create a playable game",
       research: "Deep research: multi-item web search + PDF report",
       image: "Generate an AI image or artwork",
+      theme: "Create a custom theme or restyle the interface",
     },
     dropZone: {
       label: "Drop files here to attach",
@@ -100,6 +101,45 @@ export default {
       subject: "Subject",
       subjectPlaceholder: "Email subject",
       message: "Message",
+    },
+    theme: {
+      cardLabel: "Theme proposal",
+      paletteLabel: "Theme colors",
+      swatch: {
+        background: "Background color",
+        surface: "Surface color",
+        text: "Text color",
+        muted: "Muted text color",
+        border: "Border color",
+      },
+      slots: "{used} of {max} custom-theme slots used",
+      option: {
+        palette: "Colors only",
+        paletteDescription: "Recolor the interface with the proposed palette.",
+        backgrounds: "Colors + backgrounds",
+        backgroundsDescription:
+          "Apply the palette and the generated desktop and mobile artwork.",
+      },
+      applyPalette: "Use colors only",
+      applyBackgrounds: "Use colors + backgrounds",
+      applying: "Applying…",
+      applied: "Applied",
+      discardedOption: "Discarded",
+      discard: "Discard proposal",
+      discarded: "Proposal discarded.",
+      expired: "This theme proposal has expired. Ask for a new one with @theme.",
+      error: "Couldn't apply this theme. Please try again.",
+      limit:
+        "You already have {max} custom themes. Delete one in Settings to make room.",
+      openSettings: "Open Settings",
+      backgroundsUnavailable: "Backgrounds aren't available for this proposal.",
+      previewDesktop: "Desktop background preview",
+      previewMobile: "Mobile background preview",
+      reason: {
+        imageBudget: "The image budget for this proposal was used up.",
+        usageUnavailable: "Image usage is unavailable right now.",
+        generationFailed: "The background images couldn't be generated.",
+      },
     },
     compacted: {
       badge: "Compacted {count} messages",

@@ -24,12 +24,20 @@ export default {
     account: "الحساب",
     signedIn: "مسجّل الدخول إلى Corez",
     appearance: "المظهر",
-    switchToLightMode: "تبديل إلى الوضع الفاتح",
-    switchToDarkMode: "تبديل إلى الوضع الداكن",
     lightMode: "الوضع الفاتح",
     darkMode: "الوضع الداكن",
-    switchToLight: "بدّل إلى الوضع الفاتح",
-    switchToDark: "بدّل إلى الوضع الداكن",
+  },
+
+  // قائمة المظهر (الإعدادات → عام). صفّا الوضع الفاتح والداكن والسمات المخصصة
+  // المحفوظة مجموعة واحدة، وتُنشأ السمات المخصصة من المحادثة.
+  theme: {
+    label: "السمة",
+    customBadge: "مخصصة",
+    createHint: "أنشئ سمتك الخاصة: اكتب @theme في المحادثة.",
+    limitHint: "{used} من {max} سمات مخصصة — احذف واحدة لإفساح المجال.",
+    deleteLabel: "حذف {name}",
+    confirmDelete: "هل تريد حذف السمة {name}؟ لا يمكن التراجع عن ذلك.",
+    deleteFailed: "تعذّر حذف السمة. حاول مرة أخرى.",
   },
 
   billing: {

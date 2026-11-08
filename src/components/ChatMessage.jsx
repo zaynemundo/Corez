@@ -1,4 +1,4 @@
-import { useId, useState } from "react";
+import { Fragment, useId, useState } from "react";
 import { Layers, Check, Maximize2 } from "lucide-react";
 import { extractCodeFromMessage } from "../services/aiService";
 import ThinkingPanel from "./ThinkingPanel.jsx";
@@ -20,6 +20,11 @@ import {
   MessageActions,
 } from "./chat/MessageActions.jsx";
 import { ImageFullscreenModal } from "./chat/ImageFullscreenModal.jsx";
+import {
+  ThemeProposalCard,
+  ThemeSettingsAction,
+  splitThemeContent,
+} from "./chat/ThemeProposalCard.jsx";
 
 export {
   extractUnfencedDeliverable,
@@ -578,7 +583,7 @@ export default function ChatMessage({
     return elements;
   };
 
-  const renderFormattedText = (content) => {
+  const renderTextParts = (content) => {
     if (!content) return null;
 
     const codeBlockRegex = /```(\w+)?\s*([\s\S]*?)```/g;
@@ -791,6 +796,45 @@ export default function ChatMessage({
         <div key={idx} className="markdown-body">
           {renderTextAndTables(part.content)}
         </div>
+      );
+    });
+  };
+
+  // The @theme proposal travels in the message content as a fenced
+  // ```corez-theme block. It is split out BEFORE the generic code-block
+  // renderer so the JSON can never render as a highlighted code block; the
+  // remaining prose keeps the existing markdown/email/code pipeline.
+  const renderFormattedText = (content) => {
+    if (!content) return null;
+    const segments = splitThemeContent(content);
+    const hasStructuredSegment = segments.some(
+      (segment) => segment.type !== "text",
+    );
+    // A malformed fence is replaced by its plain-text content above, so the
+    // original string must not be re-rendered (that is how a broken fence
+    // would leak back in as a code block).
+    const wasTransformed =
+      segments.length !== 1 || segments[0].content !== content;
+    if (!hasStructuredSegment && !wasTransformed) return renderTextParts(content);
+
+    return segments.map((segment, index) => {
+      if (segment.type === "theme") {
+        return (
+          <ThemeProposalCard
+            key={`theme-${index}`}
+            proposal={segment.proposal}
+            readOnly={readOnly}
+          />
+        );
+      }
+      if (segment.type === "settings") {
+        return <ThemeSettingsAction key={`theme-settings-${index}`} />;
+      }
+      if (!String(segment.content || "").trim()) return null;
+      return (
+        <Fragment key={`theme-text-${index}`}>
+          {renderTextParts(segment.content)}
+        </Fragment>
       );
     });
   };

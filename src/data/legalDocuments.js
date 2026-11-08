@@ -160,6 +160,7 @@ export const LEGAL_DOCUMENTS = {
           { type: "ul", items: [
             "**Account data** — while your account exists. Delete your account and it is removed from the live database.",
             "**Chats, messages and stored assets** — until you delete the chat or your account. Individual chats can be deleted in the app at any time.",
+            "**Custom theme backgrounds** — the desktop and mobile images generated for a saved theme are kept until you delete that theme in Settings or delete your account. Deleting a theme removes its images.",
             "**Published pages** — until you unpublish or delete them, or delete your account.",
             "**Billing records** — retained as long as tax and accounting law requires (up to five years in the UAE), even after account deletion.",
             "**Password reset tokens** — single use and short-lived, then expired and purged.",
@@ -446,7 +447,7 @@ export const LEGAL_DOCUMENTS = {
           { type: "table", columns: ["Name", "Type", "Purpose", "Lifetime"], rows: [
             ["corez_session", "Cookie (HttpOnly, Secure, SameSite=Lax)", "Keeps you signed in; sent only to corez.pro", "7 days, or until you log out"],
             ["oauth_state", "Cookie (HttpOnly, Secure, SameSite=Lax)", "Prevents cross-site request forgery during Google sign-in", "10 minutes"],
-            ["corez_theme", "Local storage", "Remembers light or dark appearance", "Until you clear site data"],
+            ["corez_theme", "Local storage", "Remembers your appearance: light, dark or a saved custom theme (palette and background images)", "Until you clear site data"],
             ["corez_pending_request", "Local storage", "Lets an in-flight build resume if the page is reloaded mid-generation", "Until the build finishes, or 12 hours"],
             ["corez_thinking_checkpoint:*", "Local storage", "Stores recent reasoning so an interrupted response can continue from it", "12 hours, or when the response completes"],
             ["corez_pending_plan, corez_next", "Local storage", "Resumes a checkout you started after signing in", "Until the checkout starts, or clearing site data"],

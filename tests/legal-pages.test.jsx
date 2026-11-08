@@ -179,8 +179,6 @@ describe('policies from Settings', () => {
                 isOpen
                 onClose={noop}
                 onClearAllHistory={noop}
-                theme="dark"
-                onToggleTheme={noop}
               />
             }
           />

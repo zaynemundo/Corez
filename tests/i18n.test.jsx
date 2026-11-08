@@ -148,8 +148,6 @@ describe("interface language", () => {
             isOpen
             onClose={() => {}}
             onClearAllHistory={() => {}}
-            theme="dark"
-            onToggleTheme={() => {}}
           />
         </I18nProvider>
       </MemoryRouter>,

@@ -9743,3 +9743,179 @@ body.corez-consent-visible .app-container {
     justify-content: flex-end;
   }
 }
+/* =====================================================================
+   CUSTOM THEMES — COSMETIC ONLY
+   A saved custom theme paints a body background image plus a set of CSS
+   variables applied by ThemeProvider. The rules below set colour and paint
+   properties only: no layout, no stacking context, no pointer interception,
+   no animation. Anything that changes layout or behaviour here is a bug.
+   Contract: tests/theme-contract.sh
+   ===================================================================== */
+
+/* ==== CUSTOM THEME BACKGROUND LAYER — PAINT ONLY ==== */
+/* The picture is a plain body background paint underneath the shell, with the
+   theme's scrim as the first background layer so text tokens stay readable on
+   any photograph. The shell above already owns all interaction; the body
+   itself never intercepts the pointer. */
+html.theme-has-backgrounds body {
+  background-color: var(--bg-primary);
+  background-image: linear-gradient(var(--theme-scrim), var(--theme-scrim)), var(--theme-image-desktop);
+  background-position: center, center;
+  background-size: cover, cover;
+  background-repeat: no-repeat, no-repeat;
+}
+
+/* Phones get a separately composed crop, uploaded by the Worker. */
+@media (max-width: 767px) {
+  html.theme-has-backgrounds body {
+    background-image: linear-gradient(var(--theme-scrim), var(--theme-scrim)), var(--theme-image-mobile);
+  }
+}
+
+/* Let the picture show through the shell: the page-level surfaces become
+   transparent and the in-pane surfaces use the theme's translucent tokens. */
+html.theme-has-backgrounds .app-container,
+html.theme-has-backgrounds .main-content,
+html.theme-has-backgrounds .chat-pane {
+  background-color: transparent;
+}
+
+html.theme-has-backgrounds .sidebar {
+  background-color: var(--theme-sidebar-bg);
+}
+
+html.theme-has-backgrounds .message-wrapper.user .message-content,
+html.theme-has-backgrounds .message-wrapper.user.conversation .message-content {
+  background-color: var(--theme-message-bg);
+}
+
+html.theme-has-backgrounds .input-box {
+  background-color: var(--theme-panel-bg);
+}
+
+/* Dialogues and cards keep a readable surface: a strong panel fill rather than
+   a hole into the photograph behind them. */
+html.theme-has-backgrounds .modal-card {
+  background-color: var(--theme-panel-strong-bg);
+}
+
+/* Custom palettes carry their own scrollbar thumb; without this a light custom
+   theme kept the dark shell's pale thumb (and a dark one the light ink). */
+html.theme-custom ::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb, rgba(255, 255, 255, 0.15));
+}
+
+/* ==== SETTINGS → APPEARANCE THEME ROWS ==== */
+/* One identical row for Light, Dark and each saved custom theme, in the same
+   visual language as the other settings rows. */
+.settings-theme-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.settings-theme-row {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.settings-theme-row .settings-row-left {
+  min-width: 0;
+}
+
+.settings-theme-row.is-selected {
+  border-color: var(--border-hover);
+  background: var(--bg-tertiary);
+}
+
+.settings-theme-check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 15px;
+}
+
+.settings-theme-custom-row {
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+  min-width: 0;
+}
+
+.settings-theme-custom-row .settings-theme-row {
+  width: auto;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.settings-theme-preview {
+  width: 26px;
+  height: 26px;
+  flex: 0 0 26px;
+  border-radius: 50%;
+  border: 1px solid var(--border-color);
+  background-color: var(--bg-primary);
+}
+
+.settings-theme-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-theme-badge {
+  flex: 0 0 auto;
+  padding: 1px 6px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-pill);
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.settings-theme-delete {
+  flex: 0 0 40px;
+  width: 40px;
+  min-height: 46px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition:
+    color var(--transition-fast),
+    background-color var(--transition-fast),
+    border-color var(--transition-fast);
+}
+
+.settings-theme-delete:hover {
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.08);
+  border-color: rgba(239, 68, 68, 0.24);
+}
+
+.settings-theme-delete:focus-visible {
+  outline: 2px solid var(--text-primary);
+  outline-offset: 2px;
+}
+
+.settings-theme-hint {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.settings-theme-error {
+  margin: 0;
+  color: #f87171;
+  font-size: 12px;
+  line-height: 1.45;
+}

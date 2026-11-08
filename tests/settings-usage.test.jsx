@@ -61,8 +61,6 @@ function renderBilling() {
           isOpen
           onClose={() => {}}
           onClearAllHistory={() => {}}
-          theme="dark"
-          onToggleTheme={() => {}}
         />
       </AuthProvider>
     </MemoryRouter>,

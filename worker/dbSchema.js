@@ -83,6 +83,41 @@ export const TABLE_MEMORY_MIGRATIONS = `CREATE TABLE IF NOT EXISTS memory_migrat
         migrated_at TEXT NOT NULL
       )`;
 
+// User-designed themes (see worker/themeRoutes.js). One row per saved custom
+// theme (max two per user); the palette and the derived CSS-variable contract
+// are stored as JSON so the client never has to recreate the design maths.
+// Background images live in R2 under theme_keys and are deleted with the row.
+export const TABLE_USER_THEMES = `CREATE TABLE IF NOT EXISTS user_themes (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        tone TEXT NOT NULL,
+        palette TEXT NOT NULL,
+        tokens TEXT NOT NULL,
+        image_keys TEXT,
+        proposal_id TEXT NOT NULL,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+      )`;
+
+// A short-lived proposal backs the two clickable options in the chat message.
+// It expires after 24h; unused background images are swept with it. Keeping the
+// proposal server-side is what makes applying idempotent and trustworthy.
+export const TABLE_THEME_PROPOSALS = `CREATE TABLE IF NOT EXISTS theme_proposals (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        palette TEXT NOT NULL,
+        tokens TEXT NOT NULL,
+        image_prompts TEXT NOT NULL,
+        image_keys TEXT,
+        backgrounds_reason TEXT,
+        status TEXT NOT NULL DEFAULT 'pending',
+        theme_id TEXT,
+        created_at INTEGER NOT NULL,
+        expires_at INTEGER NOT NULL
+      )`;
+
 export const TABLE_SUBSCRIPTIONS = `CREATE TABLE IF NOT EXISTS subscriptions (
       id TEXT PRIMARY KEY,
       user_id TEXT NOT NULL,
@@ -227,6 +262,14 @@ export const INDEX_USER_MEMORIES_USER_UPDATED = `CREATE INDEX IF NOT EXISTS idx_
 
 export const INDEX_USER_MEMORIES_USER_CATEGORY = `CREATE INDEX IF NOT EXISTS idx_user_memories_user_category ON user_memories(user_id, category)`;
 
+export const INDEX_USER_THEMES_USER_CREATED = `CREATE INDEX IF NOT EXISTS idx_user_themes_user_created ON user_themes(user_id, created_at DESC)`;
+
+export const INDEX_USER_THEMES_PROPOSAL = `CREATE UNIQUE INDEX IF NOT EXISTS idx_user_themes_proposal ON user_themes(proposal_id)`;
+
+export const INDEX_THEME_PROPOSALS_USER_CREATED = `CREATE INDEX IF NOT EXISTS idx_theme_proposals_user_created ON theme_proposals(user_id, created_at DESC)`;
+
+export const INDEX_THEME_PROPOSALS_STATUS_EXPIRY = `CREATE INDEX IF NOT EXISTS idx_theme_proposals_status_expiry ON theme_proposals(status, expires_at)`;
+
 export const INDEX_SUBSCRIPTIONS_USER = `CREATE INDEX IF NOT EXISTS idx_subscriptions_user ON subscriptions(user_id, created_at DESC)`;
 
 export const INDEX_SUBSCRIPTIONS_STATUS = `CREATE INDEX IF NOT EXISTS idx_subscriptions_status ON subscriptions(status)`;
@@ -357,6 +400,17 @@ export const MEMORY_SCHEMA = Object.freeze({
   columns: [],
 });
 
+export const THEMES_SCHEMA = Object.freeze({
+  tables: [TABLE_USER_THEMES, TABLE_THEME_PROPOSALS],
+  indexes: [
+    INDEX_USER_THEMES_USER_CREATED,
+    INDEX_USER_THEMES_PROPOSAL,
+    INDEX_THEME_PROPOSALS_USER_CREATED,
+    INDEX_THEME_PROPOSALS_STATUS_EXPIRY,
+  ],
+  columns: [],
+});
+
 export const SUBSCRIPTIONS_SCHEMA = Object.freeze({
   tables: [TABLE_SUBSCRIPTIONS, TABLE_PAYMENT_LEDGER],
   indexes: [
@@ -434,6 +488,8 @@ export const ALL_TABLES = Object.freeze([
   TABLE_PROJECTS,
   TABLE_USER_MEMORIES,
   TABLE_MEMORY_MIGRATIONS,
+  TABLE_USER_THEMES,
+  TABLE_THEME_PROPOSALS,
   TABLE_SUBSCRIPTIONS,
   TABLE_PAYMENT_LEDGER,
   TABLE_USAGE_COUNTERS,
@@ -461,6 +517,10 @@ export const ALL_INDEXES = Object.freeze([
   INDEX_PROJECTS_USER_UPDATED,
   INDEX_USER_MEMORIES_USER_UPDATED,
   INDEX_USER_MEMORIES_USER_CATEGORY,
+  INDEX_USER_THEMES_USER_CREATED,
+  INDEX_USER_THEMES_PROPOSAL,
+  INDEX_THEME_PROPOSALS_USER_CREATED,
+  INDEX_THEME_PROPOSALS_STATUS_EXPIRY,
   INDEX_SUBSCRIPTIONS_USER,
   INDEX_SUBSCRIPTIONS_STATUS,
   INDEX_PAYMENT_LEDGER_USER,

@@ -393,12 +393,17 @@ export function useChatTurnExecution({
         promptText,
       );
 
+    // @theme is cosmetic: it must never open the preview canvas even when the
+    // description happens to contain a creation verb and noun ("build a dark
+    // dashboard theme").
+    const isThemeCommand = /^\s*@theme\b/i.test(promptText);
     const isCreationIntent =
-      isRevision ||
-      /^\s*@(game|website|app)\b/i.test(promptText) ||
-      /\b(build|create|make|generate|design|develop|code|revise|update|fix|modify|refactor)\b.{0,80}\b(game|app|website|tool|dashboard|calculator|canvas|platformer|pong|shooter|snake|rpg|3d|code)\b/i.test(
-        promptText,
-      );
+      !isThemeCommand &&
+      (isRevision ||
+        /^\s*@(game|website|app)\b/i.test(promptText) ||
+        /\b(build|create|make|generate|design|develop|code|revise|update|fix|modify|refactor)\b.{0,80}\b(game|app|website|tool|dashboard|calculator|canvas|platformer|pong|shooter|snake|rpg|3d|code)\b/i.test(
+          promptText,
+        ));
 
     userDismissedCanvasRef.current = false;
 
@@ -413,7 +418,7 @@ export function useChatTurnExecution({
       Boolean(locationContext) &&
       !isRevision &&
       !isCreationIntent &&
-      !/^\s*@(image|website|game)\b/i.test(promptText);
+      !/^\s*@(image|website|game|theme)\b/i.test(promptText);
     const promptForModel = locationApplies
       ? `${apiPrompt}\n\n[Location context: ${locationContext}]`
       : apiPrompt;

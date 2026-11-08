@@ -60,6 +60,7 @@ import {
   handleMixedQuestionImageRequest,
   isExplicitImageRequest,
 } from "./ai/imagePipeline.js";
+import { runThemeCommand } from "./ai/themePipeline.js";
 import { generateSessionTitle, generateAISessionTitle } from "./ai/sessionTitle.js";
 import {
   isGameDevIntent,
@@ -113,6 +114,7 @@ export {
   generateImage,
   generateWorkersAIImage,
   runImageCommand,
+  runThemeCommand,
   createImageTitle,
   isMixedQuestionImageRequest,
   extractImageSubject,
@@ -809,15 +811,18 @@ export async function generateAIResponse(
   retryOpts = {},
   onThinking = null,
 ) {
-  // Explicit commands first: @website, @game, @research, @image. The command
-  // token is stripped before any model sees the prompt, so the AI is never
-  // confused by it.
+  // Explicit commands first: @website, @game, @research, @image, @theme. The
+  // command token is stripped before any model sees the prompt, so the AI is
+  // never confused by it.
   const { command, rest } = parseSlashCommand(prompt);
   if (command === "research") {
     return runResearchCommand(rest, history, signal);
   }
   if (command === "image") {
     return runImageCommand(rest, history, signal);
+  }
+  if (command === "theme") {
+    return runThemeCommand(rest, signal);
   }
 
   let cleanPrompt =

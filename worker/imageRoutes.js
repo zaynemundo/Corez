@@ -452,6 +452,185 @@ async function imageResultBase64(result) {
   return "";
 }
 
+// Shorthand model names accepted from the client, mapped to the Workers AI
+// catalogue. Shared by /api/image/cf and the theme designer.
+const WORKERS_AI_IMAGE_MODEL_ALIASES = {
+  "sdxl-lightning": WORKERS_AI_SDXL_LIGHTNING_MODEL,
+  sdxl: WORKERS_AI_SDXL_LIGHTNING_MODEL,
+  lightning: WORKERS_AI_SDXL_LIGHTNING_MODEL,
+  "stable-diffusion-xl-lightning": WORKERS_AI_SDXL_LIGHTNING_MODEL,
+  "stable-diffusion-xl-lighting": WORKERS_AI_SDXL_LIGHTNING_MODEL,
+  "flux-klein": WORKERS_AI_IMAGE_MODEL,
+  "flux-klein-9b": WORKERS_AI_IMAGE_MODEL,
+  "klein-9b": WORKERS_AI_IMAGE_MODEL,
+  "flux-9b": WORKERS_AI_IMAGE_MODEL,
+  "flux-klein-4b": WORKERS_AI_IMAGE_FAST_MODEL,
+  "klein-4b": WORKERS_AI_IMAGE_FAST_MODEL,
+  "flux-4b": WORKERS_AI_IMAGE_FAST_MODEL,
+  fast: WORKERS_AI_IMAGE_FAST_MODEL,
+  "flux-schnell": WORKERS_AI_FALLBACK_MODEL,
+  flux: WORKERS_AI_IMAGE_MODEL,
+  schnell: WORKERS_AI_FALLBACK_MODEL,
+  dreamshaper: "@cf/lykon/dreamshaper-8-lcm",
+  "sdxl-base": "@cf/stabilityai/stable-diffusion-xl-base-1.0",
+};
+
+function resolveWorkersAIImageModel(requestedModel, referenceImage) {
+  if (referenceImage) return WORKERS_AI_IMAGE_MODEL;
+  const requested =
+    typeof requestedModel === "string" ? requestedModel.trim() : "";
+  const aliased =
+    WORKERS_AI_IMAGE_MODEL_ALIASES[requested.toLowerCase()] || requested;
+  return aliased && ALLOWED_WORKERS_AI_IMAGE_MODELS.has(aliased)
+    ? aliased
+    : WORKERS_AI_IMAGE_MODEL;
+}
+
+/**
+ * Generate one image through Workers AI: prompt expansion, model selection,
+ * reference-image rules and the model-fallback chain. Storage, the image budget
+ * and HTTP responses stay with the caller, so the theme designer can reuse the
+ * exact provider behaviour without copying it.
+ *
+ * @returns {Promise<{base64: string, mimeType: string, extension: string, model: string}>}
+ * @throws {Error & {status?: number}} status 400/499/502/503 for HTTP mapping.
+ */
+export async function generateWorkersAIImageBytes(env, options = {}) {
+  const ai = env?.AI;
+  if (!ai || typeof ai.run !== "function") {
+    const error = new Error(
+      "Workers AI image generation is unavailable: no AI binding is configured on this deployment.",
+    );
+    error.status = 503;
+    throw error;
+  }
+
+  const prompt =
+    typeof options.prompt === "string" ? options.prompt.trim() : "";
+  if (!prompt) {
+    const error = new Error("Prompt is required.");
+    error.status = 400;
+    throw error;
+  }
+
+  const rawReference = options.referenceImage;
+  const referenceImage = validateReferenceImage(rawReference);
+  if (typeof rawReference === "string" && rawReference && !referenceImage) {
+    const error = new Error(
+      "referenceImage must be a base64 data:image URL or a public https URL.",
+    );
+    error.status = 400;
+    throw error;
+  }
+  if (referenceImage && !referenceImage.startsWith("data:image/")) {
+    const error = new Error(
+      "Workers AI image editing requires a data:image reference, not a remote URL.",
+    );
+    error.status = 400;
+    throw error;
+  }
+
+  const selectedModel = resolveWorkersAIImageModel(
+    options.model,
+    referenceImage,
+  );
+  let usedModel = selectedModel;
+  const signal = options.signal || null;
+  const formBody = {
+    width: options.width,
+    height: options.height,
+    seed: options.seed,
+  };
+
+  let result;
+  try {
+    // FLUX.2 consumes multipart/form-data for both text-to-image and reference
+    // editing. A reference goes in as binary input_image_0; serialize the
+    // FormData through a Response so the binding receives the body plus boundary.
+    const formResponse = buildWorkersAIImageForm(
+      enhanceImagePrompt(prompt) || prompt,
+      formBody,
+      referenceImage,
+    );
+    const inputs = {
+      multipart: {
+        body: formResponse.body,
+        contentType: formResponse.headers.get("content-type"),
+      },
+    };
+    try {
+      result = await ai.run(
+        selectedModel,
+        inputs,
+        signal ? { signal } : undefined,
+      );
+    } catch (primaryErr) {
+      const message = String(primaryErr?.message || "");
+      const isModelNotFound =
+        /model not found|unknown model|not available|400|404/i.test(message);
+      // Reference editing must stay on a model that accepts input_image_0;
+      // text-only flux-1-schnell would silently discard the user reference.
+      const fallbackModel = referenceImage
+        ? selectedModel !== WORKERS_AI_IMAGE_FAST_MODEL
+          ? WORKERS_AI_IMAGE_FAST_MODEL
+          : null
+        : selectedModel !== WORKERS_AI_FALLBACK_MODEL
+          ? WORKERS_AI_FALLBACK_MODEL
+          : WORKERS_AI_SDXL_LIGHTNING_MODEL;
+      if (!isModelNotFound || !fallbackModel) throw primaryErr;
+      console.warn(
+        `Primary Workers AI model ${selectedModel} failed (${safeErrorDetail(primaryErr)}), trying fallback ${fallbackModel}`,
+      );
+      const fallbackResponse = buildWorkersAIImageForm(
+        enhanceImagePrompt(prompt) || prompt,
+        formBody,
+        referenceImage,
+      );
+      const fallbackInputs = {
+        multipart: {
+          body: fallbackResponse.body,
+          contentType: fallbackResponse.headers.get("content-type"),
+        },
+      };
+      result = await ai.run(
+        fallbackModel,
+        fallbackInputs,
+        signal ? { signal } : undefined,
+      );
+      usedModel = fallbackModel;
+    }
+  } catch (err) {
+    if (signal?.aborted || err?.name === "AbortError") {
+      const cancelled = new Error("Image request cancelled.");
+      cancelled.status = 499;
+      throw cancelled;
+    }
+    console.warn("Workers AI image generation failed:", safeErrorDetail(err));
+    const failure = new Error(
+      "Image generation failed: the Workers AI provider returned an error.",
+    );
+    failure.status = 502;
+    throw failure;
+  }
+
+  const base64 = await imageResultBase64(result);
+  if (!base64) {
+    const failure = new Error(
+      "Image generation failed: the Workers AI provider returned no image.",
+    );
+    failure.status = 502;
+    throw failure;
+  }
+  const mimeType = mimeFromBase64(base64);
+  const extension =
+    mimeType === "image/jpeg"
+      ? "jpg"
+      : mimeType === "image/webp"
+        ? "webp"
+        : "png";
+  return { base64, mimeType, extension, model: usedModel };
+}
+
 export async function handleWorkersAIImage(request, env) {
   if (request.method !== "POST") {
     return jsonResponse(405, { error: "Method not allowed." });
@@ -507,151 +686,27 @@ export async function handleWorkersAIImage(request, env) {
     return controller.signal;
   })();
 
-  // A bare request ("flower") underspecifies the image: expand it into a
-  // complete generator prompt. Crafted prompts pass through untouched.
-  const enhancedPrompt = enhanceImagePrompt(prompt) || prompt;
-
-  // A user-supplied reference image turns text-to-image into an edit. Only
-  // SDXL base accepts an image input on Workers AI; FLUX.2 cannot preserve the
-  // reference, so the model choice is fixed when a reference is present.
-  const referenceImage = validateReferenceImage(body.referenceImage);
-  if (
-    typeof body.referenceImage === "string" &&
-    body.referenceImage &&
-    !referenceImage
-  ) {
-    return jsonResponse(400, {
-      error:
-        "referenceImage must be a base64 data:image URL or a public https URL.",
-    });
-  }
-  if (referenceImage && !referenceImage.startsWith("data:image/")) {
-    return jsonResponse(400, {
-      error:
-        "Workers AI image editing requires a data:image reference, not a remote URL.",
-    });
-  }
-
-  // Allow client to request a specific Workers AI model (e.g. sdxl-lightning)
-  let requestedModel =
-    typeof body.model === "string" ? body.model.trim() : "";
-  // Normalize shorthands: sdxl-lightning, sdxl, dreamshaper, etc.
-  const modelAliases = {
-    "sdxl-lightning": WORKERS_AI_SDXL_LIGHTNING_MODEL,
-    sdxl: WORKERS_AI_SDXL_LIGHTNING_MODEL,
-    lightning: WORKERS_AI_SDXL_LIGHTNING_MODEL,
-    "stable-diffusion-xl-lightning": WORKERS_AI_SDXL_LIGHTNING_MODEL,
-    "stable-diffusion-xl-lighting": WORKERS_AI_SDXL_LIGHTNING_MODEL,
-    "flux-klein": WORKERS_AI_IMAGE_MODEL,
-    "flux-klein-9b": WORKERS_AI_IMAGE_MODEL,
-    "klein-9b": WORKERS_AI_IMAGE_MODEL,
-    "flux-9b": WORKERS_AI_IMAGE_MODEL,
-    "flux-klein-4b": WORKERS_AI_IMAGE_FAST_MODEL,
-    "klein-4b": WORKERS_AI_IMAGE_FAST_MODEL,
-    "flux-4b": WORKERS_AI_IMAGE_FAST_MODEL,
-    fast: WORKERS_AI_IMAGE_FAST_MODEL,
-    "flux-schnell": WORKERS_AI_FALLBACK_MODEL,
-    flux: WORKERS_AI_IMAGE_MODEL,
-    schnell: WORKERS_AI_FALLBACK_MODEL,
-    dreamshaper: "@cf/lykon/dreamshaper-8-lcm",
-    "sdxl-base": "@cf/stabilityai/stable-diffusion-xl-base-1.0",
-  };
-  if (modelAliases[requestedModel.toLowerCase()]) {
-    requestedModel = modelAliases[requestedModel.toLowerCase()];
-  }
-  const selectedModel = referenceImage
-    ? WORKERS_AI_IMAGE_MODEL
-    : requestedModel && ALLOWED_WORKERS_AI_IMAGE_MODELS.has(requestedModel)
-      ? requestedModel
-      : WORKERS_AI_IMAGE_MODEL;
-  let usedModel = selectedModel;
-
-  let result;
+  let generated;
   try {
-    // FLUX.2 consumes multipart/form-data for both text-to-image and reference
-    // editing. A reference goes in as binary input_image_0 (the documented
-    // multi-reference field); serialize the FormData through a Response so the
-    // binding receives the body plus its boundary.
-    const formResponse = buildWorkersAIImageForm(
-      enhancedPrompt,
-      body,
-      referenceImage,
-    );
-    const inputs = {
-      multipart: {
-        body: formResponse.body,
-        contentType: formResponse.headers.get("content-type"),
-      },
-    };
-    try {
-      result = await ai.run(
-        selectedModel,
-        inputs,
-        clientSignal ? { signal: clientSignal } : undefined,
-      );
-    } catch (primaryErr) {
-      const msg = String(primaryErr?.message || "");
-      const isModelNotFound =
-        /model not found|unknown model|not available|400|404/i.test(msg);
-      // Reference editing must stay on a model that accepts input_image_0;
-      // text-only flux-1-schnell would silently discard the user's room.
-      const fallbackModel = referenceImage
-        ? selectedModel !== WORKERS_AI_IMAGE_FAST_MODEL
-          ? WORKERS_AI_IMAGE_FAST_MODEL
-          : null
-        : selectedModel !== WORKERS_AI_FALLBACK_MODEL
-          ? WORKERS_AI_FALLBACK_MODEL
-          : WORKERS_AI_SDXL_LIGHTNING_MODEL;
-      if (!isModelNotFound || !fallbackModel) throw primaryErr;
-      console.warn(
-        `Primary Workers AI model ${selectedModel} failed (${safeErrorDetail(primaryErr)}), trying fallback ${fallbackModel}`,
-      );
-      const fallbackResponse = buildWorkersAIImageForm(
-        enhancedPrompt,
-        body,
-        referenceImage,
-      );
-      const fallbackInputs = {
-        multipart: {
-          body: fallbackResponse.body,
-          contentType: fallbackResponse.headers.get("content-type"),
-        },
-      };
-      result = await ai.run(
-        fallbackModel,
-        fallbackInputs,
-        clientSignal ? { signal: clientSignal } : undefined,
-      );
-      usedModel = fallbackModel;
-    }
+    generated = await generateWorkersAIImageBytes(env, {
+      prompt,
+      width: body.width,
+      height: body.height,
+      seed: body.seed,
+      model: body.model,
+      referenceImage: body.referenceImage,
+      signal: clientSignal,
+    });
   } catch (err) {
-    if (clientSignal?.aborted || err?.name === "AbortError") {
-      return jsonResponse(499, { error: "Image request cancelled." });
-    }
-    console.warn("Workers AI image generation failed:", safeErrorDetail(err));
-    return jsonResponse(502, {
-      error:
-        "Image generation failed: the Workers AI provider returned an error.",
+    const status = Number(err?.status) || 502;
+    return jsonResponse(status, {
+      error: String(err?.message || "Image generation failed."),
     });
   }
 
-  const base64 = await imageResultBase64(result);
-  if (!base64) {
-    return jsonResponse(502, {
-      error:
-        "Image generation failed: the Workers AI provider returned no image.",
-    });
-  }
-
+  const { base64, mimeType, extension, model: usedModel } = generated;
   // Persist to R2 when available; otherwise return the inline data URL. The
   // data URL is always the safe fallback — it is never fetched again.
-  const mimeType = mimeFromBase64(base64);
-  const extension =
-    mimeType === "image/jpeg"
-      ? "jpg"
-      : mimeType === "image/webp"
-        ? "webp"
-        : "png";
   const r2Key = `image_cf_${Date.now()}_${Math.random().toString(36).slice(2, 7)}.${extension}`;
   let imageUrl = `data:${mimeType};base64,${base64}`;
   try {

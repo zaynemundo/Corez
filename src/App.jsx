@@ -26,6 +26,7 @@ import SharedChat from "./pages/SharedChat";
 import CookieConsent from "./components/CookieConsent";
 import { startAnalytics, trackPageView } from "./services/analytics";
 import { AuthProvider, useAuth } from "./context/AuthContext";
+import { ThemeProvider, useTheme } from "./context/ThemeContext";
 import {
   dropChatPrefetches,
   prefetchChat,
@@ -108,7 +109,7 @@ function useChatIdFromUrl() {
   }, [location.pathname]);
 }
 
-function MainApp({ theme, setTheme }) {
+function MainApp() {
   const navigate = useNavigate();
   const location = useLocation();
   // The shell hosts two screens: the conversation and the Sites list. The URL is
@@ -117,6 +118,9 @@ function MainApp({ theme, setTheme }) {
   const chatIdFromUrl = useChatIdFromUrl();
   const { user } = useAuth();
   const { t } = useI18n();
+  // Appearance lives in ThemeProvider; the shell only mirrors the effective
+  // tone to the parts of the interface that still take it as a prop (Sidebar).
+  const { mode: themeMode, setMode: setThemeMode } = useTheme();
 
   const [activeView, setActiveView] = useState("chat");
   const [sidebarOpen, setSidebarOpen] = useState(() => {
@@ -304,6 +308,14 @@ function MainApp({ theme, setTheme }) {
     window.addEventListener("keydown", closeSidebarWithEscape);
     return () => window.removeEventListener("keydown", closeSidebarWithEscape);
   }, [isMobileViewport, sidebarOpen]);
+
+  // The chat theme card (and any other surface that cannot reach the data
+  // flow) asks the shell to open Settings with this event.
+  useEffect(() => {
+    const openSettings = () => setSettingsOpen(true);
+    window.addEventListener("corez:open-settings", openSettings);
+    return () => window.removeEventListener("corez:open-settings", openSettings);
+  }, []);
 
   useEffect(() => {
     if (activeView === "chat") {
@@ -511,9 +523,9 @@ function MainApp({ theme, setTheme }) {
         onShareSession={setShareChatId}
         onOpenSettings={() => setSettingsOpen(true)}
         activeView={activeView}
-        theme={theme}
+        theme={themeMode}
         onToggleTheme={() =>
-          setTheme((prev) => (prev === "dark" ? "light" : "dark"))
+          setThemeMode(themeMode === "dark" ? "light" : "dark")
         }
         onCloseSidebar={() => setSidebarOpen(false)}
         onOpenSidebar={() => setSidebarOpen(true)}
@@ -801,10 +813,6 @@ function MainApp({ theme, setTheme }) {
         isOpen={settingsOpen}
         onClose={() => setSettingsOpen(false)}
         onClearAllHistory={handleClearAllHistory}
-        theme={theme}
-        onToggleTheme={() =>
-          setTheme((prev) => (prev === "dark" ? "light" : "dark"))
-        }
       />
     </div>
   );
@@ -854,40 +862,8 @@ function AppInner() {
   const { user, loading, sessionCheckFailed, refresh } = useAuth();
   const { t } = useI18n();
   const location = useLocation();
-  const [theme, setTheme] = useState(() => {
-    try {
-      return localStorage.getItem("corez_theme") || "dark";
-    } catch {
-      return "dark";
-    }
-  });
 
   useEffect(() => startAnalytics(), []);
-
-  useEffect(() => {
-    document.documentElement.setAttribute("data-theme", theme);
-    try {
-      localStorage.setItem("corez_theme", theme);
-    } catch {
-      /* Ignore storage errors */
-    }
-    var meta = document.querySelector('meta[name="theme-color"]');
-    if (meta)
-      meta.setAttribute("content", theme === "light" ? "#f7f7f7" : "#000000");
-  }, [theme]);
-
-  useEffect(() => {
-    const onStorage = (e) => {
-      if (
-        e.key === "corez_theme" &&
-        (e.newValue === "light" || e.newValue === "dark")
-      ) {
-        setTheme(e.newValue);
-      }
-    };
-    window.addEventListener("storage", onStorage);
-    return () => window.removeEventListener("storage", onStorage);
-  }, []);
 
   const prefetchChatId = useChatIdFromUrl();
   useEffect(() => {
@@ -953,15 +929,9 @@ function AppInner() {
   }
   return (
     <Routes>
-      <Route path="/" element={<MainApp theme={theme} setTheme={setTheme} />} />
-      <Route
-        path="/chat/:chatId"
-        element={<MainApp theme={theme} setTheme={setTheme} />}
-      />
-      <Route
-        path="/sites"
-        element={<MainApp theme={theme} setTheme={setTheme} />}
-      />
+      <Route path="/" element={<MainApp />} />
+      <Route path="/chat/:chatId" element={<MainApp />} />
+      <Route path="/sites" element={<MainApp />} />
       <Route path="/pricing" element={<Pricing />} />
       <Route path="/payment/success" element={<PaymentSuccess />} />
       <Route path="/share/chat/:token" element={<SharedChat />} />
@@ -975,9 +945,11 @@ export default function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <AppInner />
-        <RouteAnalytics />
-        <CookieConsent />
+        <ThemeProvider>
+          <AppInner />
+          <RouteAnalytics />
+          <CookieConsent />
+        </ThemeProvider>
       </AuthProvider>
     </BrowserRouter>
   );

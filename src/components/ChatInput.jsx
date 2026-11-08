@@ -10,6 +10,7 @@ import {
   Loader2,
   Search,
   Image as ImageIcon,
+  Palette,
   X,
 } from "lucide-react";
 import { PlusIcon } from "./icons";
@@ -73,6 +74,14 @@ const COMMANDS = [
     descriptionKey: "chat.composer.commands.image",
     icon: ImageIcon,
     placeholder: "Describe the image you want to generate...",
+  },
+  {
+    command: "theme",
+    label: "@theme",
+    name: "Theme",
+    descriptionKey: "chat.composer.commands.theme",
+    icon: Palette,
+    placeholder: "Describe the theme you want to create...",
   },
 ];
 

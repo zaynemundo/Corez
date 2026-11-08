@@ -46,8 +46,6 @@ function renderSettings(onClose = () => {}) {
           isOpen
           onClose={onClose}
           onClearAllHistory={() => {}}
-          theme="dark"
-          onToggleTheme={() => {}}
         />
       </AuthProvider>
     </MemoryRouter>,
@@ -227,8 +225,6 @@ describe('settings categories', () => {
             isOpen={false}
             onClose={onClose}
             onClearAllHistory={() => {}}
-            theme="dark"
-            onToggleTheme={() => {}}
           />
         </AuthProvider>
       </MemoryRouter>,
@@ -240,8 +236,6 @@ describe('settings categories', () => {
             isOpen
             onClose={onClose}
             onClearAllHistory={() => {}}
-            theme="dark"
-            onToggleTheme={() => {}}
           />
         </AuthProvider>
       </MemoryRouter>,

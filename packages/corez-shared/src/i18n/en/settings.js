@@ -26,12 +26,20 @@ export default {
     account: "Account",
     signedIn: "Signed in to Corez",
     appearance: "Appearance",
-    switchToLightMode: "Switch to light mode",
-    switchToDarkMode: "Switch to dark mode",
     lightMode: "Light mode",
     darkMode: "Dark mode",
-    switchToLight: "Switch to light",
-    switchToDark: "Switch to dark",
+  },
+
+  // Appearance list (Settings → General). The light/dark rows and the saved
+  // custom themes are one group; custom palettes are created from chat.
+  theme: {
+    label: "Theme",
+    customBadge: "Custom",
+    createHint: "Create your own theme: type @theme in chat.",
+    limitHint: "{used} of {max} custom themes — delete one to make room.",
+    deleteLabel: "Delete {name}",
+    confirmDelete: "Delete the {name} theme? This cannot be undone.",
+    deleteFailed: "Could not delete the theme. Try again.",
   },
 
   billing: {

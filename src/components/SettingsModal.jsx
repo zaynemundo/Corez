@@ -14,8 +14,10 @@ import {
   ArrowRight,
   ShieldCheck,
   Globe,
+  Check,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
+import { useTheme } from "../context/ThemeContext";
 import { useI18n } from "../i18n/index.jsx";
 import { formatDate } from "../i18n/format.js";
 import { openConsentPreferences } from "../services/consentService";
@@ -36,12 +38,40 @@ const SETTINGS_CATEGORIES = [
   { id: "privacy", labelKey: "settings.tabs.privacy" },
 ];
 
+// The two built-in appearances are rows in the same list as the saved custom
+// themes, so choosing one is a single, identical interaction.
+const THEME_MODE_ROWS = [
+  { id: "light", labelKey: "settings.general.lightMode", icon: Sun },
+  { id: "dark", labelKey: "settings.general.darkMode", icon: Moon },
+];
+
+// A saved custom theme shows a preview of its own background image when it has
+// one, and otherwise a swatch of the palette it will paint.
+function themePreviewStyle(theme) {
+  const desktop =
+    typeof theme?.images?.desktop === "string" ? theme.images.desktop : "";
+  const safe =
+    desktop &&
+    (desktop.startsWith("https://") ||
+      desktop.startsWith("data:image/") ||
+      (desktop.startsWith("/") && !desktop.startsWith("//")));
+  if (safe) {
+    return {
+      backgroundImage: `url("${desktop}")`,
+      backgroundSize: "cover",
+      backgroundPosition: "center",
+    };
+  }
+  return {
+    backgroundColor: theme?.palette?.background || "var(--bg-primary)",
+    borderColor: theme?.palette?.border || "var(--border-color)",
+  };
+}
+
 export default function SettingsModal({
   isOpen,
   onClose,
   onClearAllHistory,
-  theme,
-  onToggleTheme,
 }) {
   let auth;
   try {
@@ -51,12 +81,22 @@ export default function SettingsModal({
   }
   const email = auth?.user?.email || "";
   const userPlan = auth?.user?.plan || "free";
-  const isDark = theme === "dark";
   const { t, language, setLanguage, languages } = useI18n();
+  // The appearance rows read and write the shared theme state; the modal owns no
+  // theme state of its own.
+  const {
+    selection,
+    customThemes,
+    maxCustomThemes,
+    setMode,
+    selectCustomTheme,
+    deleteCustomTheme,
+  } = useTheme();
   const [sub, setSub] = useState(null);
   const [subLoading, setSubLoading] = useState(false);
   const [category, setCategory] = useState(SETTINGS_CATEGORIES[0].id);
   const [usage, setUsage] = useState(null);
+  const [themeDeleteFailed, setThemeDeleteFailed] = useState(false);
   const tabRefs = useRef({});
   const wasOpenRef = useRef(false);
   const titleId = "settings-modal-title";
@@ -125,6 +165,21 @@ export default function SettingsModal({
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [isOpen, onClose]);
+
+  // Deleting a saved theme is destructive, so it asks first. The active theme
+  // falls back to the dark base inside the provider, never to a dangling id.
+  const handleDeleteTheme = async (themeEntry) => {
+    let confirmed = true;
+    if (typeof window !== "undefined" && typeof window.confirm === "function") {
+      confirmed = window.confirm(
+        t("settings.theme.confirmDelete", { name: themeEntry.name }),
+      );
+    }
+    if (!confirmed) return;
+    setThemeDeleteFailed(false);
+    const deleted = await deleteCustomTheme(themeEntry.id);
+    if (!deleted) setThemeDeleteFailed(true);
+  };
 
   // Standard tab-list keyboard model: arrows move and select, Home/End jump.
   const onTabsKeyDown = (event) => {
@@ -228,24 +283,87 @@ export default function SettingsModal({
 
         <div className="settings-section">
           <div className="settings-section-label">{t("settings.general.appearance")}</div>
-          <button
-            type="button"
-            className="settings-row-btn"
-            onClick={onToggleTheme}
-            aria-label={isDark ? t("settings.general.switchToLightMode") : t("settings.general.switchToDarkMode")}
+          {/* Theme choice is cosmetic: this list only tells ThemeProvider which
+              palette to paint. It never changes layout or behaviour. */}
+          <div
+            className="settings-theme-list"
+            role="group"
+            aria-label={t("settings.theme.label")}
           >
-            <span className="settings-row-left">
-              {isDark ? (
-                <Sun size={16} strokeWidth={1.5} />
-              ) : (
-                <Moon size={16} strokeWidth={1.5} />
-              )}
-              <span>{isDark ? t("settings.general.lightMode") : t("settings.general.darkMode")}</span>
-            </span>
-            <span className="settings-row-hint">
-              {isDark ? t("settings.general.switchToLight") : t("settings.general.switchToDark")}
-            </span>
-          </button>
+            {THEME_MODE_ROWS.map((entry) => {
+              const Icon = entry.icon;
+              const selected = selection === entry.id;
+              return (
+                <button
+                  key={entry.id}
+                  type="button"
+                  className={`settings-row-btn settings-theme-row${selected ? " is-selected" : ""}`}
+                  aria-pressed={selected}
+                  onClick={() => setMode(entry.id)}
+                >
+                  <span className="settings-row-left">
+                    <Icon size={16} strokeWidth={1.5} aria-hidden="true" />
+                    <span>{t(entry.labelKey)}</span>
+                  </span>
+                  <span className="settings-row-hint settings-theme-check" aria-hidden="true">
+                    {selected ? <Check size={15} strokeWidth={2} /> : null}
+                  </span>
+                </button>
+              );
+            })}
+            {customThemes.map((themeEntry) => {
+              const selected = selection === `custom:${themeEntry.id}`;
+              return (
+                <div
+                  key={themeEntry.id}
+                  className={`settings-theme-custom-row${selected ? " is-selected" : ""}`}
+                >
+                  <button
+                    type="button"
+                    className={`settings-row-btn settings-theme-row${selected ? " is-selected" : ""}`}
+                    aria-pressed={selected}
+                    onClick={() => selectCustomTheme(themeEntry.id)}
+                  >
+                    <span className="settings-row-left">
+                      <span
+                        className="settings-theme-preview"
+                        style={themePreviewStyle(themeEntry)}
+                        aria-hidden="true"
+                      />
+                      <span className="settings-theme-name">{themeEntry.name}</span>
+                      <span className="settings-theme-badge">
+                        {t("settings.theme.customBadge")}
+                      </span>
+                    </span>
+                    <span className="settings-row-hint settings-theme-check" aria-hidden="true">
+                      {selected ? <Check size={15} strokeWidth={2} /> : null}
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    className="settings-theme-delete"
+                    aria-label={t("settings.theme.deleteLabel", { name: themeEntry.name })}
+                    onClick={() => handleDeleteTheme(themeEntry)}
+                  >
+                    <Trash2 size={14} strokeWidth={1.5} aria-hidden="true" />
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+          <p className="settings-theme-hint">
+            {customThemes.length >= maxCustomThemes
+              ? t("settings.theme.limitHint", {
+                  used: customThemes.length,
+                  max: maxCustomThemes,
+                })
+              : t("settings.theme.createHint")}
+          </p>
+          {themeDeleteFailed && (
+            <p className="settings-theme-error" role="alert">
+              {t("settings.theme.deleteFailed")}
+            </p>
+          )}
         </div>
 
         <div className="settings-section">

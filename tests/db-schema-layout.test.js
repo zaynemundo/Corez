@@ -25,7 +25,9 @@ function tableName(createTable) {
 }
 
 function indexName(createIndex) {
-  const match = createIndex.match(/CREATE INDEX IF NOT EXISTS\s+(\S+)/);
+  // Unique indexes are allowed too (e.g. user_themes.proposal_id); the mirror
+  // rule is what the test is about, not the uniqueness modifier.
+  const match = createIndex.match(/CREATE (?:UNIQUE )?INDEX IF NOT EXISTS\s+(\S+)/);
   return match ? match[1] : null;
 }
 

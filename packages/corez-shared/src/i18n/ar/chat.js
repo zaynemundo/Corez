@@ -23,6 +23,7 @@ export default {
       game: "إنشاء لعبة قابلة للعب",
       research: "بحث معمّق: بحث ويب متعدد النتائج + تقرير PDF",
       image: "توليد صورة أو عمل فني بالذكاء الاصطناعي",
+      theme: "إنشاء سمة مخصّصة أو تغيير مظهر الواجهة",
     },
     dropZone: {
       label: "أفلت الملفات هنا لإرفاقها",
@@ -87,6 +88,45 @@ export default {
       subject: "الموضوع",
       subjectPlaceholder: "موضوع البريد",
       message: "الرسالة",
+    },
+    theme: {
+      cardLabel: "اقتراح سمة",
+      paletteLabel: "ألوان السمة",
+      swatch: {
+        background: "لون الخلفية",
+        surface: "لون السطح",
+        text: "لون النص",
+        muted: "لون النص الخافت",
+        border: "لون الحدود",
+      },
+      slots: "تم استخدام {used} من {max} من مواضع السمات المخصّصة",
+      option: {
+        palette: "الألوان فقط",
+        paletteDescription: "إعادة تلوين الواجهة باللوحة المقترحة.",
+        backgrounds: "الألوان + الخلفيات",
+        backgroundsDescription:
+          "تطبيق اللوحة والخلفيات المولّدة للحاسوب والهاتف.",
+      },
+      applyPalette: "استخدام الألوان فقط",
+      applyBackgrounds: "استخدام الألوان + الخلفيات",
+      applying: "جارٍ التطبيق…",
+      applied: "مطبّقة",
+      discardedOption: "مرفوضة",
+      discard: "رفض الاقتراح",
+      discarded: "تم رفض الاقتراح.",
+      expired: "انتهت صلاحية اقتراح السمة هذا. اطلب اقتراحًا جديدًا عبر @theme.",
+      error: "تعذّر تطبيق هذه السمة. حاول مرة أخرى.",
+      limit:
+        "لديك بالفعل {max} من السمات المخصّصة. احذف واحدة من الإعدادات لإفساح المجال.",
+      openSettings: "فتح الإعدادات",
+      backgroundsUnavailable: "الخلفيات غير متاحة لهذا الاقتراح.",
+      previewDesktop: "معاينة خلفية الحاسوب",
+      previewMobile: "معاينة خلفية الهاتف",
+      reason: {
+        imageBudget: "تم استهلاك ميزانية الصور لهذا الاقتراح.",
+        usageUnavailable: "استخدام الصور غير متاح الآن.",
+        generationFailed: "تعذّر توليد صور الخلفية.",
+      },
     },
     compacted: {
       badge: "تم ضغط {count} من الرسائل",

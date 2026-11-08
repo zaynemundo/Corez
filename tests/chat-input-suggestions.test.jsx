@@ -35,6 +35,9 @@ describe('ChatInput @ command suggestions', () => {
     expect(screen.getByText('Create a playable game')).toBeTruthy();
     expect(screen.getByText('Deep research: multi-item web search + PDF report')).toBeTruthy();
     expect(screen.getByText('Generate an AI image or artwork')).toBeTruthy();
+    expect(
+      screen.getByText('Create a custom theme or restyle the interface')
+    ).toBeTruthy();
   });
 
   it('shows no suggestions when the user types "/"', () => {
@@ -44,6 +47,9 @@ describe('ChatInput @ command suggestions', () => {
     expect(screen.queryByText('Create a playable game')).toBeNull();
     expect(screen.queryByText('Deep research: multi-item web search + PDF report')).toBeNull();
     expect(screen.queryByText('Generate an AI image or artwork')).toBeNull();
+    expect(
+      screen.queryByText('Create a custom theme or restyle the interface')
+    ).toBeNull();
   });
 
   it('filters suggestions by the typed @ prefix', () => {
@@ -53,6 +59,9 @@ describe('ChatInput @ command suggestions', () => {
     expect(screen.queryByText('Create a website or web page')).toBeNull();
     expect(screen.queryByText('Deep research: multi-item web search + PDF report')).toBeNull();
     expect(screen.queryByText('Generate an AI image or artwork')).toBeNull();
+    expect(
+      screen.queryByText('Create a custom theme or restyle the interface')
+    ).toBeNull();
   });
 
   it('filters suggestions for @image prefix', () => {
@@ -62,6 +71,23 @@ describe('ChatInput @ command suggestions', () => {
     expect(screen.queryByText('Create a website or web page')).toBeNull();
     expect(screen.queryByText('Create a playable game')).toBeNull();
     expect(screen.queryByText('Deep research: multi-item web search + PDF report')).toBeNull();
+    expect(
+      screen.queryByText('Create a custom theme or restyle the interface')
+    ).toBeNull();
+  });
+
+  it('filters suggestions for the theme command', () => {
+    const t = setup();
+    typeInto(t, '@th');
+    expect(
+      screen.getByText('Create a custom theme or restyle the interface')
+    ).toBeTruthy();
+    expect(screen.queryByText('Create a website or web page')).toBeNull();
+    expect(screen.queryByText('Create a playable game')).toBeNull();
+    expect(
+      screen.queryByText('Deep research: multi-item web search + PDF report')
+    ).toBeNull();
+    expect(screen.queryByText('Generate an AI image or artwork')).toBeNull();
   });
 
   it('shows no suggestions for plain text', () => {
@@ -69,6 +95,9 @@ describe('ChatInput @ command suggestions', () => {
     typeInto(t, 'build me a website');
     expect(screen.queryByText('Create a website or web page')).toBeNull();
     expect(screen.queryByText('Generate an AI image or artwork')).toBeNull();
+    expect(
+      screen.queryByText('Create a custom theme or restyle the interface')
+    ).toBeNull();
   });
 
   it('selects a suggestion with Enter and fills only the command token', () => {
@@ -81,6 +110,22 @@ describe('ChatInput @ command suggestions', () => {
     fireEvent.keyDown(textarea, { key: 'ArrowDown' }); // @game
     fireEvent.keyDown(textarea, { key: 'Enter' });
     expect(value).toBe('@game ');
+  });
+
+  it('walks down to the theme suggestion with ArrowDown', () => {
+    let value = '@';
+    const setter = (v) => { value = v; };
+    const utils = render(<ChatInput input={value} setInput={setter} onSendMessage={() => {}} isStreaming={false} />);
+    const textarea = utils.container.querySelector('textarea');
+    fireEvent.change(textarea, { target: { value: '@' } });
+    utils.rerender(<ChatInput input={value} setInput={setter} onSendMessage={() => {}} isStreaming={false} />);
+    // Order stays website, game, research, image, then the appended theme.
+    fireEvent.keyDown(textarea, { key: 'ArrowDown' }); // @game
+    fireEvent.keyDown(textarea, { key: 'ArrowDown' }); // @research
+    fireEvent.keyDown(textarea, { key: 'ArrowDown' }); // @image
+    fireEvent.keyDown(textarea, { key: 'ArrowDown' }); // @theme
+    fireEvent.keyDown(textarea, { key: 'Enter' });
+    expect(value).toBe('@theme ');
   });
 
   it('selects the first suggestion with Tab', () => {
@@ -120,6 +165,19 @@ describe('ChatInput @ command suggestions', () => {
     utils.rerender(<ChatInput input={value} setInput={setter} onSendMessage={() => {}} isStreaming={false} />);
     fireEvent.click(screen.getByText('Generate an AI image or artwork'));
     expect(value).toBe('@image ');
+  });
+
+  it('selects the theme suggestion on click', () => {
+    let value = '@';
+    const setter = (v) => { value = v; };
+    const utils = render(<ChatInput input={value} setInput={setter} onSendMessage={() => {}} isStreaming={false} />);
+    const textarea = utils.container.querySelector('textarea');
+    fireEvent.change(textarea, { target: { value: '@' } });
+    utils.rerender(<ChatInput input={value} setInput={setter} onSendMessage={() => {}} isStreaming={false} />);
+    fireEvent.click(
+      screen.getByText('Create a custom theme or restyle the interface')
+    );
+    expect(value).toBe('@theme ');
   });
 
   it('does not render a quick actions bar', () => {

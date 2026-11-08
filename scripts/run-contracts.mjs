@@ -49,6 +49,10 @@ const CHECKS = [
   { name: "env question skill", runner: "bash", script: "tests/env-question-skill-contract.sh" },
   { name: "UI responsive", runner: "bash", script: "tests/ui-responsive-contract.sh" },
   { name: "thinking indicator", runner: "bash", script: "tests/thinking-indicator-contract.sh" },
+  // User-designed themes: the Worker API/proposal lifecycle contract and the
+  // cosmetic-only CSS contract (themes may change colours, never layout).
+  { name: "theme worker", runner: "node", script: "tests/theme-worker-contract.mjs" },
+  { name: "theme css", runner: "bash", script: "tests/theme-contract.sh" },
   { name: "public intent", runner: "bash", script: "tests/ai-public-intent-contract.sh" },
   { name: "local intent classifier", runner: "bash", script: "tests/ai-local-intent-classifier-contract.sh" },
   { name: "AGY wrapper", runner: "bash", script: "tests/agy-wrapper-contract.sh" },

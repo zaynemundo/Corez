@@ -10,7 +10,8 @@
     "./intent/model": "./src/intent/intent-classifier-model.js",
     "./intent/userFacts": "./src/intent/userFacts.js",
     "./artifacts": "./src/artifacts/index.js",
-    "./i18n": "./src/i18n/index.js"
+    "./i18n": "./src/i18n/index.js",
+    "./theme": "./src/theme/palette.js"
   },
   "engines": {
     "node": ">=22.0.0"

@@ -27,8 +27,6 @@ function renderModal(isOpen) {
         isOpen={isOpen}
         onClose={() => {}}
         onClearAllHistory={() => {}}
-        theme="dark"
-        onToggleTheme={() => {}}
       />
     </MemoryRouter>,
   );
@@ -54,8 +52,6 @@ describe('SettingsModal hooks discipline', () => {
           isOpen
           onClose={() => {}}
           onClearAllHistory={() => {}}
-          theme="dark"
-          onToggleTheme={() => {}}
         />
       </MemoryRouter>,
     );
@@ -72,8 +68,6 @@ describe('SettingsModal hooks discipline', () => {
             isOpen={false}
             onClose={() => {}}
             onClearAllHistory={() => {}}
-            theme="dark"
-            onToggleTheme={() => {}}
           />
         </MemoryRouter>,
       );
@@ -83,8 +77,6 @@ describe('SettingsModal hooks discipline', () => {
             isOpen
             onClose={() => {}}
             onClearAllHistory={() => {}}
-            theme="dark"
-            onToggleTheme={() => {}}
           />
         </MemoryRouter>,
       );

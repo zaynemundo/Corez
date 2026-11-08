@@ -45,6 +45,14 @@ CREATE TABLE IF NOT EXISTS memory_migrations (user_id TEXT PRIMARY KEY, migrated
 CREATE INDEX IF NOT EXISTS idx_user_memories_user_updated ON user_memories(user_id, updated_at DESC);
 CREATE INDEX IF NOT EXISTS idx_user_memories_user_category ON user_memories(user_id, category);
 
+-- User-designed themes (see worker/themeRoutes.js) ---------------------------
+CREATE TABLE IF NOT EXISTS user_themes (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, name TEXT NOT NULL, tone TEXT NOT NULL, palette TEXT NOT NULL, tokens TEXT NOT NULL, image_keys TEXT, proposal_id TEXT NOT NULL, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL);
+CREATE INDEX IF NOT EXISTS idx_user_themes_user_created ON user_themes(user_id, created_at DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_user_themes_proposal ON user_themes(proposal_id);
+CREATE TABLE IF NOT EXISTS theme_proposals (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, name TEXT NOT NULL, palette TEXT NOT NULL, tokens TEXT NOT NULL, image_prompts TEXT NOT NULL, image_keys TEXT, backgrounds_reason TEXT, status TEXT NOT NULL DEFAULT 'pending', theme_id TEXT, created_at INTEGER NOT NULL, expires_at INTEGER NOT NULL);
+CREATE INDEX IF NOT EXISTS idx_theme_proposals_user_created ON theme_proposals(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_theme_proposals_status_expiry ON theme_proposals(status, expires_at);
+
 -- Subscriptions and payment ledger -------------------------------------------
 CREATE TABLE IF NOT EXISTS subscriptions (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, plan TEXT NOT NULL, amount INTEGER NOT NULL, currency_code TEXT NOT NULL DEFAULT 'AED', status TEXT NOT NULL DEFAULT 'pending', period_start INTEGER, period_end INTEGER, ziina_payment_id TEXT, test_mode INTEGER NOT NULL DEFAULT 0, abandoned_at INTEGER, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS payment_ledger (payment_id TEXT PRIMARY KEY, user_id TEXT NOT NULL, plan TEXT NOT NULL, amount INTEGER NOT NULL DEFAULT 0, currency_code TEXT NOT NULL DEFAULT 'AED', interval TEXT NOT NULL DEFAULT 'month', status TEXT NOT NULL DEFAULT 'processing', claim_token TEXT, subscription_id TEXT, period_start INTEGER, period_end INTEGER, test_mode INTEGER NOT NULL DEFAULT 0, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL);

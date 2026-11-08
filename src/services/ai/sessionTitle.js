@@ -44,6 +44,22 @@ export function generateSessionTitle(prompt) {
       );
     }
 
+    if (command === "theme") {
+      const subject = rest
+        .replace(/^(please\s+)?(can you|could you|would you|please)\s+/i, "")
+        .replace(
+          /^(create|make|design|generate|build|give me|i want|i need|need|want)\s+(me\s+)?/i,
+          "",
+        )
+        .replace(/^(a|an|the)\s+/i, "")
+        .replace(/\s*[.!?]+$/, "")
+        .trim();
+      return capitalizeTitle(`Create a ${subject || "custom"} theme`).slice(
+        0,
+        40,
+      );
+    }
+
     const fine = classifyIntentNew(clean);
     const type = fine?.primaryIntent || fine?.type || "general";
     const lower = clean.toLowerCase();
@@ -116,6 +132,11 @@ export function generateSessionTitle(prompt) {
 export async function generateAISessionTitle(prompt) {
   const clean = String(prompt || "").trim();
   if (!clean) return generateSessionTitle(clean);
+  // @theme has one sensible deterministic title ("Create a … theme"), so it
+  // never spends the extra title-only model call.
+  if (parseSlashCommand(clean).command === "theme") {
+    return generateSessionTitle(clean);
+  }
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 5000);
   try {

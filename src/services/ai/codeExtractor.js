@@ -181,7 +181,13 @@ export function extractCodeFromMessage(text) {
   return null;
 }
 
-const AT_COMMANDS = new Set(["website", "game", "research", "image"]);
+const AT_COMMANDS = new Set([
+  "website",
+  "game",
+  "research",
+  "image",
+  "theme",
+]);
 
 export function parseSlashCommand(prompt) {
   const text = String(prompt || "").trim();
