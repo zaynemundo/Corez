@@ -107,8 +107,16 @@ describe("MarkdownView rendering", () => {
   it("offers a canvas preview for a complete HTML artifact", async () => {
     await renderMarkdown(
       "```html\n<!doctype html><html><body><h1>Hello canvas</h1></body></html>\n```",
+      { onReviseCode: jest.fn() },
     );
     expect(screen.queryByText("Preview")).toBeTruthy();
+    expect(screen.queryByText("Revise")).toBeTruthy();
+    // The artifact is a compact action card: only Preview/Revise, never the
+    // long HTML source or a Copy action.
+    expect(screen.queryByText("Copy")).toBeNull();
+    expect(
+      screen.queryByText(/<!doctype html><html><body><h1>Hello canvas/i),
+    ).toBeNull();
     await fireEvent.press(screen.getByText("Preview"));
     expect(screen.getByText("Preview canvas")).toBeTruthy();
     expect(screen.getByTestId("corez-webview")).toBeTruthy();
@@ -117,6 +125,7 @@ describe("MarkdownView rendering", () => {
   it("does not offer a canvas preview for a non-HTML snippet", async () => {
     await renderMarkdown("```js\nconst x = 1;\n```");
     expect(screen.queryByText("Preview")).toBeNull();
+    expect(screen.queryByText(/const x = 1;/)).toBeTruthy();
   });
 
   it("offers a Revise action on HTML artifacts and passes the code back", async () => {

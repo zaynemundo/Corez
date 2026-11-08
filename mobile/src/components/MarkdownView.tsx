@@ -20,6 +20,7 @@ import {
   View,
 } from "react-native";
 import * as Clipboard from "expo-clipboard";
+import { Feather } from "@expo/vector-icons";
 import { marked, type Token } from "marked";
 import { useTheme } from "@/state/theme";
 import { useI18n } from "@/i18n";
@@ -384,6 +385,75 @@ function CodeBlock({ code, language }: { code: string; language: string }) {
     }
   };
 
+  if (canPreview) {
+    // Artifacts become a compact action bar (like the web) instead of dumping
+    // the whole HTML document into the conversation.
+    return (
+      <View
+        style={[
+          styles.artifactCard,
+          { backgroundColor: colors.bgCard, borderColor: colors.border },
+        ]}
+      >
+        <View style={styles.artifactActions}>
+          {openCanvas ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t("canvas.preview")}
+              onPress={() => openCanvas(code)}
+              style={({ pressed }) => [
+                styles.artifactPrimary,
+                {
+                  backgroundColor: colors.actionStrong,
+                  opacity: pressed ? 0.85 : 1,
+                },
+              ]}
+            >
+              <Feather
+                name="eye"
+                size={15}
+                color={colors.actionStrongContrast}
+              />
+              <Text
+                style={[
+                  styles.artifactActionLabel,
+                  { color: colors.actionStrongContrast },
+                ]}
+              >
+                {t("canvas.preview")}
+              </Text>
+            </Pressable>
+          ) : null}
+          {reviseCode ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t("chat.code.revise")}
+              onPress={() => reviseCode(code)}
+              style={({ pressed }) => [
+                styles.artifactSecondary,
+                {
+                  backgroundColor: colors.bgSecondary,
+                  borderColor: colors.borderHover,
+                  opacity: pressed ? 0.85 : 1,
+                },
+              ]}
+            >
+              <Feather name="edit-3" size={15} color={colors.textPrimary} />
+              <Text
+                style={[
+                  styles.artifactActionLabel,
+                  { color: colors.textPrimary },
+                ]}
+              >
+                {t("chat.code.revise")}
+              </Text>
+            </Pressable>
+          ) : null}
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View
       style={[
@@ -401,30 +471,6 @@ function CodeBlock({ code, language }: { code: string; language: string }) {
           {language || t("chat.code.plain")}
         </Text>
         <View style={styles.codeActions}>
-          {canPreview && openCanvas ? (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={t("canvas.preview")}
-              onPress={() => openCanvas(code)}
-              hitSlop={8}
-            >
-              <Text style={[styles.codeAction, { color: colors.textPrimary }]}>
-                {t("canvas.preview")}
-              </Text>
-            </Pressable>
-          ) : null}
-          {canPreview && reviseCode ? (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={t("chat.code.revise")}
-              onPress={() => reviseCode(code)}
-              hitSlop={8}
-            >
-              <Text style={[styles.codeAction, { color: colors.textPrimary }]}>
-                {t("chat.code.revise")}
-              </Text>
-            </Pressable>
-          ) : null}
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={t("chat.code.copy")}
@@ -501,6 +547,35 @@ const styles = StyleSheet.create({
   },
   tableHeaderText: { fontSize: 13, fontWeight: "700" },
   tableCellText: { fontSize: 13, lineHeight: 19 },
+  artifactCard: {
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 14,
+    padding: 10,
+  },
+  artifactActions: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  artifactPrimary: {
+    flex: 1,
+    minHeight: 44,
+    borderRadius: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 7,
+  },
+  artifactSecondary: {
+    flex: 1,
+    minHeight: 44,
+    borderRadius: 12,
+    borderWidth: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 7,
+  },
+  artifactActionLabel: { fontSize: 13, fontWeight: "600" },
   codeBlock: {
     borderWidth: StyleSheet.hairlineWidth,
     borderRadius: 10,

@@ -17,7 +17,7 @@ the Capacitor shell in `android/` (see [MOBILE.md](./MOBILE.md)) is legacy.
 | Markdown rendering: headings, lists, tables, fenced code with copy, links, inline images | Done |
 | Attachments: camera/gallery/files, R2 upload, vision-shaped API attachments, user-bubble previews | Done |
 | Composer parity with the web: one right-hand action that is the microphone while the input is empty and Send/Stop as soon as there is text (or while streaming) | Done |
-| HTML artifact blocks: Preview opens the canvas, **Revise** prefills the composer with `Revise code:` and carries the artifact into the next `/api/ai` turn (same context block the web sends), Copy keeps the source | Done |
+| HTML artifacts render as a compact **Preview / Revise** card instead of dumping the long source into the conversation; Copy stays available for ordinary code snippets | Done |
 | UI icons: Feather vector icons instead of emoji/text glyphs in the composer, attachment sheet, chat header, back/close buttons, thinking panel and history actions | Done |
 | Voice dictation: expo-audio recording → `/api/transcribe` (Whisper), en/ar language, 120s cap | Done |
 | Chat management: rename, pin/unpin, delete, pinned/recent sections, title header | Done |
