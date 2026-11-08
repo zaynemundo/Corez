@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { Link, Redirect } from "expo-router";
-import { StyleSheet, Text, View } from "react-native";
+import { Redirect, router } from "expo-router";
+import { Pressable, StyleSheet, Text } from "react-native";
 import { AuthScaffold } from "@/components/AuthScaffold";
 import { AuthField } from "@/components/AuthField";
 import { PrimaryButton } from "@/components/PrimaryButton";
@@ -36,19 +36,19 @@ export default function LoginScreen() {
     <AuthScaffold
       title={t("auth.login.subtitle")}
       footer={
-        <View style={styles.footerRow}>
+        <Pressable
+          accessibilityRole="link"
+          accessibilityLabel={`${t("auth.login.noAccount")} ${t("auth.login.signUpLink")}`}
+          onPress={() => router.push("/signup")}
+          style={styles.footerRow}
+        >
           <Text style={{ color: theme.colors.textSecondary, fontSize: 13.5 }}>
             {t("auth.login.noAccount")}{" "}
           </Text>
-          <Link href="/signup" asChild>
-            <Text
-              style={[styles.link, { color: theme.colors.textPrimary }]}
-              accessibilityRole="link"
-            >
-              {t("auth.login.signUpLink")}
-            </Text>
-          </Link>
-        </View>
+          <Text style={[styles.link, { color: theme.colors.textPrimary }]}>
+            {t("auth.login.signUpLink")}
+          </Text>
+        </Pressable>
       }
     >
       <AuthField

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, Redirect } from "expo-router";
+import { Redirect, router } from "expo-router";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import * as WebBrowser from "expo-web-browser";
 import { AuthScaffold } from "@/components/AuthScaffold";
@@ -56,19 +56,19 @@ export default function SignupScreen() {
     <AuthScaffold
       title={t("auth.signup.subtitle")}
       footer={
-        <View style={styles.footerRow}>
+        <Pressable
+          accessibilityRole="link"
+          accessibilityLabel={`${t("auth.signup.alreadyHaveAccount")} ${t("auth.common.login")}`}
+          onPress={() => router.push("/login")}
+          style={styles.footerRow}
+        >
           <Text style={{ color: theme.colors.textSecondary, fontSize: 13.5 }}>
             {t("auth.signup.alreadyHaveAccount")}{" "}
           </Text>
-          <Link href="/login" asChild>
-            <Text
-              style={[styles.link, { color: theme.colors.textPrimary }]}
-              accessibilityRole="link"
-            >
-              {t("auth.common.login")}
-            </Text>
-          </Link>
-        </View>
+          <Text style={[styles.link, { color: theme.colors.textPrimary }]}>
+            {t("auth.common.login")}
+          </Text>
+        </Pressable>
       }
     >
       <AuthField
