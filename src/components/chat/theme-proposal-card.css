@@ -5,10 +5,14 @@
    proposal itself (swatches); chrome colours come from the app tokens. */
 
 .theme-proposal-card {
+  /* The proposal is a message-level decision, so it uses the whole message
+     column rather than a narrow centred card. */
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
-  max-inline-size: 620px;
+  inline-size: 100%;
+  max-inline-size: none;
+  box-sizing: border-box;
   margin-block: 0.75rem;
   padding-block: 0.9rem;
   padding-inline: 1rem;
@@ -334,7 +338,6 @@
 
 @media (max-width: 767px) {
   .theme-proposal-card {
-    max-inline-size: 100%;
     padding-block: 0.8rem;
     padding-inline: 0.8rem;
   }
