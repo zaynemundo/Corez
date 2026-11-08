@@ -50,6 +50,7 @@ function createHarness() {
     spec: VALID_SPEC,
     providerMode: "ok",
     providerCalls: 0,
+    providerBodies: [],
   };
   const env = {
     DB: db,
@@ -64,7 +65,10 @@ function createHarness() {
     OPENCODE_GO_API_KEY: "sk-opencode-test",
   };
   const realFetch = globalThis.fetch;
-  globalThis.fetch = async (url) => {
+  globalThis.fetch = async (url, init) => {
+    state.providerBodies.push(
+      typeof init?.body === "string" ? init.body : "",
+    );
     const target = String(url);
     if (!target.includes("opencode.ai") && !target.includes("api.")) {
       return new Response("unexpected fetch", { status: 500 });
@@ -105,6 +109,8 @@ function createHarness() {
   };
   const propose = (prompt, extraEnv = {}, ip = nextIp()) =>
     request("/api/themes/propose", "POST", { prompt }, extraEnv, ip);
+  const proposeBody = (body, extraEnv = {}, ip = nextIp()) =>
+    request("/api/themes/propose", "POST", body, extraEnv, ip);
   const json = async (response) => ({ status: response.status, body: await response.json() });
   return {
     db,
@@ -113,6 +119,7 @@ function createHarness() {
     state,
     request,
     propose,
+    proposeBody,
     json,
     restore() {
       globalThis.fetch = realFetch;
@@ -156,6 +163,34 @@ async function run() {
 
     // --- propose: palette + two background images -------------------------
     harness.state.providerMode = "ok";
+    // --- attached-image reference colours reach the designer ---------------
+    res = await harness.json(
+      await harness.proposeBody({
+        prompt: "this orange as a theme",
+        referenceColors: ["#ff8800", "not-a-colour", "#FFAA00"],
+      }),
+    );
+    assert.equal(res.status, 200);
+    const referenceProposal = res.body.proposal;
+    assert.ok(
+      harness.state.providerBodies.some(
+        (body) =>
+          body.includes("#ff8800") &&
+          body.includes("#ffaa00") &&
+          !body.includes("not-a-colour"),
+      ),
+      "valid reference colours reach the design prompt; invalid ones are dropped",
+    );
+    res = await harness.json(
+      await harness.request(
+        "/api/themes/proposals/" + referenceProposal.proposalId + "/discard",
+        "POST",
+        {},
+      ),
+    );
+    assert.equal(res.status, 200);
+    assert.equal(harness.bucket.objects.size, 0);
+
     res = await harness.json(
       await harness.propose("a 911 Porsche in red"),
     );
@@ -311,11 +346,11 @@ async function run() {
 
     // --- per-client rate limit ---------------------------------------------
     const limitedIp = "198.51.100.77";
-    for (let attempt = 0; attempt < 5; attempt += 1) {
+    for (let attempt = 0; attempt < 10; attempt += 1) {
       const allowed = await harness.json(
         await harness.propose("rate check " + attempt, {}, limitedIp),
       );
-      assert.equal(allowed.status, 200, "first five proposals from one IP are allowed");
+      assert.equal(allowed.status, 200, "first ten proposals from one IP are allowed");
     }
     const limited = await harness.json(
       await harness.propose("rate check final", {}, limitedIp),

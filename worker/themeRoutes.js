@@ -37,8 +37,10 @@ import {
 
 // Designing a theme spends a text model call and two image generations, so the
 // endpoint is bounded per client and per account-day on top of the image budget.
-const themeRateLimiter = createRateLimiter({ windowMs: 60_000, limit: 5 });
-const PROPOSALS_PER_DAY = 12;
+// The per-minute bound is intentionally generous: a user iterating on a theme
+// (typing a new idea, deleting one, retrying) should not get a "busy" wall.
+const themeRateLimiter = createRateLimiter({ windowMs: 60_000, limit: 10 });
+const PROPOSALS_PER_DAY = 20;
 const THEME_IMAGE_MODEL = "@cf/black-forest-labs/flux-2-klein-4b";
 const BACKGROUND_SIZE = {
   desktop: { width: 1536, height: 864, label: "16:9 desktop wallpaper" },
@@ -236,13 +238,22 @@ function extractJsonObject(text) {
   }
 }
 
-async function designTheme(env, prompt, signal) {
+async function designTheme(env, prompt, signal, referenceColors = []) {
+  // When the user attached a picture ("I want this orange"), its sampled colours
+  // are the ground truth for the hue; the model only designs the surfaces.
+  const referenceHint =
+    referenceColors.length > 0
+      ? "\n\nReference colours sampled from the user's attached image: " +
+        referenceColors.join(", ") +
+        ". Build the palette around these hues (they are the source of truth for the colour), while keeping text readable."
+      : "";
   let lastError = null;
   for (let attempt = 0; attempt < 2; attempt += 1) {
+    const baseMessage = prompt + referenceHint;
     const userMessage =
       attempt === 0
-        ? prompt
-        : `${prompt}\n\nYour previous reply was rejected (${lastError || "invalid JSON"}). Reply with the JSON object only.`;
+        ? baseMessage
+        : `${baseMessage}\n\nYour previous reply was rejected (${lastError || "invalid JSON"}). Reply with the JSON object only.`;
     const result = await runProviderChainSafe(env, [
       { role: "system", content: buildThemeSystemPrompt() },
       { role: "user", content: userMessage },
@@ -393,14 +404,6 @@ async function listThemes(env, uid) {
 }
 
 async function handlePropose(request, env, uid) {
-  const retryAfter = themeRateLimiter(request);
-  if (retryAfter !== null) {
-    return jsonResponse(
-      429,
-      { error: "Too many theme requests. Try again shortly.", code: "rate_limited" },
-      { "Retry-After": String(retryAfter) },
-    );
-  }
   let body;
   try {
     body = await readBoundedJson(request);
@@ -418,6 +421,14 @@ async function handlePropose(request, env, uid) {
   if (prompt.length > 280) {
     return errorResponse(400, "Keep the theme description under 280 characters.", "invalid_prompt");
   }
+
+  const rawReferenceColors = Array.isArray(body?.referenceColors)
+    ? body.referenceColors
+    : [];
+  const referenceColors = rawReferenceColors
+    .filter((value) => typeof value === "string" && /^#[0-9a-f]{6}$/i.test(value.trim()))
+    .map((value) => value.trim().toLowerCase())
+    .slice(0, 6);
 
   const slotsUsed = await themeCount(env, uid);
   if (slotsUsed >= MAX_CUSTOM_THEMES) {
@@ -437,7 +448,23 @@ async function handlePropose(request, env, uid) {
     );
   }
 
-  const designed = await designTheme(env, prompt, request.signal);
+  // The per-client rate limit only counts requests that were otherwise valid
+  // and are about to spend a model call + image budget.
+  const retryAfter = themeRateLimiter(request);
+  if (retryAfter !== null) {
+    return jsonResponse(
+      429,
+      { error: "Too many theme requests. Try again shortly.", code: "rate_limited" },
+      { "Retry-After": String(retryAfter) },
+    );
+  }
+
+  const designed = await designTheme(
+    env,
+    prompt,
+    request.signal,
+    referenceColors,
+  );
   if (!designed) {
     return errorResponse(
       502,

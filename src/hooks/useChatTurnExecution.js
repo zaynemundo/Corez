@@ -496,6 +496,7 @@ export function useChatTurnExecution({
           setStreamingThinking(streamingThinkingRef.current);
           scheduleCheckpoint();
         },
+        { attachments: attachmentsArg, rawPrompt: promptText },
       );
       if (response) {
         const thinkingSeconds = thinkingStartedAtRef.current

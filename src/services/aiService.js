@@ -810,6 +810,7 @@ export async function generateAIResponse(
   onClear = null,
   retryOpts = {},
   onThinking = null,
+  options = {},
 ) {
   // Explicit commands first: @website, @game, @research, @image, @theme. The
   // command token is stripped before any model sees the prompt, so the AI is
@@ -822,7 +823,15 @@ export async function generateAIResponse(
     return runImageCommand(rest, history, signal);
   }
   if (command === "theme") {
-    return runThemeCommand(rest, signal);
+    // The raw input is used so the attachment block appended for the model does
+    // not leak into the theme description; attachments travel separately so
+    // their colours can be sampled for the palette.
+    const raw = options.rawPrompt ? parseSlashCommand(options.rawPrompt) : null;
+    const themeText = raw && raw.command === "theme" ? raw.rest : rest;
+    return runThemeCommand(themeText, signal, {
+      attachments: options.attachments,
+      referenceColors: options.referenceColors,
+    });
   }
 
   let cleanPrompt =

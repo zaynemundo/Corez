@@ -6,6 +6,7 @@ import {
   buildThemeIntro,
   formatThemeProposalFence,
   mapThemeProposalError,
+  quantizeImagePixels,
   runThemeCommand,
 } from "../src/services/ai/themePipeline.js";
 import {
@@ -80,6 +81,24 @@ describe("runThemeCommand", () => {
     expect(JSON.parse(init.body)).toEqual({
       prompt: "warm sunset with soft gradients",
     });
+  });
+
+  it("sends reference colours sampled from an attached image", async () => {
+    const proposal = makeProposal();
+    const fetchMock = vi.fn(async () => Response.json({ proposal }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await runThemeCommand("this orange", null, {
+      referenceColors: ["#FF8800", "not-a-colour", "#0A1224"],
+    });
+
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(body).toEqual({
+      prompt: "this orange",
+      referenceColors: ["#ff8800", "#0a1224"],
+    });
+    expect(response).toContain("matched the palette");
+    expect(parseFence(response)).toEqual(proposal);
   });
 
   it("returns a short intro with both option labels followed by the exact fence", async () => {
@@ -190,6 +209,12 @@ describe("theme error mapping", () => {
     expect(mapThemeProposalError(0, null)).toMatch(/connection/i);
   });
 
+  it("distinguishes the daily theme limit from a short cooldown", () => {
+    expect(mapThemeProposalError(429, "proposal_limit")).toMatch(/today/i);
+    expect(mapThemeProposalError(429, "rate_limited")).toMatch(/cooling/i);
+    expect(mapThemeProposalError(429, null)).toMatch(/busy/i);
+  });
+
   it("names expired and already-used proposals instead of offering a retry", () => {
     expect(mapThemeProposalError(410, "proposal_expired")).toMatch(
       /has expired/i,
@@ -200,6 +225,29 @@ describe("theme error mapping", () => {
     expect(mapThemeProposalError(409, "proposal_used")).not.toContain(
       OPEN_SETTINGS_MARKER,
     );
+  });
+});
+
+describe("reference image colours", () => {
+  it("quantizes orange-dominant pixels and keeps distinct shades", () => {
+    const pixels = new Uint8ClampedArray([
+      255, 136, 0, 255,
+      250, 140, 10, 255,
+      248, 132, 4, 255,
+      255, 255, 255, 255,
+      255, 255, 255, 255,
+      0, 0, 0, 255,
+      255, 136, 0, 0,
+    ]);
+    const colors = quantizeImagePixels(pixels, 2);
+    expect(colors.length).toBeLessThanOrEqual(2);
+    expect(colors[0]).toMatch(/^#f[0-9a-f]/i);
+    expect(colors).toContain("#ffffff");
+  });
+
+  it("returns nothing for empty or invalid pixel data", () => {
+    expect(quantizeImagePixels(null)).toEqual([]);
+    expect(quantizeImagePixels(new Uint8ClampedArray([]))).toEqual([]);
   });
 });
 
