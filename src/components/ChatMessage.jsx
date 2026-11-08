@@ -176,7 +176,31 @@ export default function ChatMessage({
   // spans/fences are handled before this splitter, so a colour inside code is
   // never turned into a chip.
   const HEX_COLOR_TOKEN =
-    /(?<![\w#])(#[0-9a-fA-F]{6}|#[0-9a-fA-F]{3})(?![\w])/g;
+    /(?<![\w#])(#(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{4}|[0-9a-fA-F]{3}))(?![\w])/g;
+
+  const renderColorChip = (color, key) => (
+    <span
+      key={key}
+      className="chat-color-chip"
+      title={color}
+      style={{ display: "inline-flex", alignItems: "center", gap: "0.3rem" }}
+    >
+      <span className="chat-color-value">{color}</span>
+      <span
+        className="chat-color-swatch"
+        aria-hidden="true"
+        style={{
+          backgroundColor: color,
+          width: "0.95em",
+          height: "0.95em",
+          minWidth: "0.95em",
+          flex: "0 0 auto",
+          display: "inline-block",
+          borderRadius: 3,
+        }}
+      />
+    </span>
+  );
 
   const renderTextWithColorChips = (text, keyBase) => {
     if (!text) return null;
@@ -189,20 +213,7 @@ export default function ChatMessage({
         pieces.push(text.slice(cursor, match.index));
       }
       const color = match[1];
-      pieces.push(
-        <span
-          key={`${keyBase}-color-${match.index}`}
-          className="chat-color-chip"
-          title={color}
-        >
-          <span className="chat-color-value">{color}</span>
-          <span
-            className="chat-color-swatch"
-            style={{ backgroundColor: color }}
-            aria-hidden="true"
-          />
-        </span>,
-      );
+      pieces.push(renderColorChip(color, `${keyBase}-color-${match.index}`));
       cursor = match.index + match[0].length;
     }
     if (cursor === 0) return text;
@@ -285,9 +296,16 @@ export default function ChatMessage({
       }
 
       if (token.startsWith("`") && token.endsWith("`") && token.length > 2) {
+        const code = token.slice(1, -1);
+        // Models habitually wrap hex values in backticks. A pure colour code is
+        // still a colour: show the value with its cube instead of the inline
+        // code pill (that pill was the "weird background").
+        if (/^#(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{4}|[0-9a-fA-F]{3})$/.test(code)) {
+          return renderColorChip(code, i);
+        }
         return (
           <code key={i} className="inline-code">
-            {token.slice(1, -1)}
+            {code}
           </code>
         );
       }

@@ -39,6 +39,14 @@ describe("hex colour chips in chat", () => {
     expect(chips[0].textContent).toContain("#abc");
   });
 
+  it("supports alpha shorthands (#ffff and #ffffff80)", () => {
+    const { container } = renderMessage("Try #ffff and #ffffff80 too.");
+    const chips = container.querySelectorAll(".chat-color-chip");
+    expect(chips).toHaveLength(2);
+    expect(chips[0].textContent).toContain("#ffff");
+    expect(chips[1].textContent).toContain("#ffffff80");
+  });
+
   it("chips colours in user messages too", () => {
     const { container } = renderMessage("make the theme #ff8800 please", "user");
     expect(container.querySelectorAll(".chat-color-chip")).toHaveLength(1);
@@ -47,11 +55,19 @@ describe("hex colour chips in chat", () => {
     );
   });
 
-  it("leaves colours inside inline code alone", () => {
-    const { container } = renderMessage("Set `color: #ffffff` in the CSS.");
+  it("turns a backticked hex value (model habit) into the same chip", () => {
+    const { container } = renderMessage("Pure white is `#ffffff` in CSS.");
+    const chips = container.querySelectorAll(".chat-color-chip");
+    expect(chips).toHaveLength(1);
+    expect(chips[0].textContent).toContain("#ffffff");
+    expect(container.querySelector(".inline-code")).toBeNull();
+  });
+
+  it("leaves inline code that is more than a bare colour as code", () => {
+    const { container } = renderMessage("Write `color: #ffffff` in the CSS.");
     expect(container.querySelectorAll(".chat-color-chip")).toHaveLength(0);
     expect(container.querySelector(".inline-code").textContent).toContain(
-      "#ffffff",
+      "color: #ffffff",
     );
   });
 
@@ -67,6 +83,15 @@ describe("hex colour chips in chat", () => {
       "C#123 is a language reference; #ffffffx is not a colour; #gggggg is invalid.",
     );
     expect(container.querySelectorAll(".chat-color-chip")).toHaveLength(0);
+  });
+
+  it("gives the swatch inline geometry so a stale stylesheet cannot hide it", () => {
+    const { container } = renderMessage("Try #ff8800.");
+    const swatch = container.querySelector(".chat-color-swatch");
+    expect(swatch).toBeTruthy();
+    expect(swatch.style.width).not.toBe("");
+    expect(swatch.style.height).not.toBe("");
+    expect(swatch.style.backgroundColor).toMatch(/255, 136, 0|#ff8800/i);
   });
 
   it("chips several colours in one paragraph", () => {
