@@ -17,6 +17,7 @@ the Capacitor shell in `android/` (see [MOBILE.md](./MOBILE.md)) is legacy.
 | Markdown rendering: headings, lists, tables, fenced code with copy, links, inline images | Done |
 | Attachments: camera/gallery/files, R2 upload, vision-shaped API attachments, user-bubble previews | Done |
 | Composer parity with the web: one right-hand action that is the microphone while the input is empty and Send/Stop as soon as there is text (or while streaming) | Done |
+| UI icons: Feather vector icons instead of emoji/text glyphs in the composer, attachment sheet, chat header, back/close buttons, thinking panel and history actions | Done |
 | Voice dictation: expo-audio recording → `/api/transcribe` (Whisper), en/ar language, 120s cap | Done |
 | Chat management: rename, pin/unpin, delete, pinned/recent sections, title header | Done |
 | Offline read cache: SQLite snapshot of the chat list and open conversation, marked as an offline copy | Done |
@@ -175,12 +176,13 @@ The debug APK was built in this workspace on 2026-11-07 with:
   manual steps. The resulting `app-release.apk` (98.18 MB, SHA-256
   `5C267FAE…D8E97C`) contains the expected feature strings and keeps the V2
   debug signature.
-- The latest release build (2026-11-08 00:05, 98.2 MB) embeds the canvas
-  preview, publishing/Sites screen, Sites analytics, native artifact downloads,
-  shared-conversation viewer and the image studio. Its
-  `assets/index.android.bundle` was checked for those feature strings and the
-  APK signature was re-verified; it is the file at
-  `mobile/build-artifacts/app-release.apk`.
+- The latest release build (2026-11-08 09:56, 100.2 MB, SHA-256
+  `C1B0D22D…AF5C15`) embeds the canvas preview, publishing/Sites screen, Sites
+  analytics, native artifact downloads, shared-conversation viewer, image
+  studio and the Feather vector icons (composer mic/send/attach, header
+  menu/share/settings, chevrons and close buttons); the brand-mark launcher
+  icon is included. Installed successfully over USB on the HONOR ALI-NX1; it
+  is the file at `mobile/build-artifacts/app-release.apk`.
 
 Install on a USB-connected device with `adb install -r` once `adb devices`
 lists the phone.

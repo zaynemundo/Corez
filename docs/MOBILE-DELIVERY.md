@@ -12,7 +12,7 @@ the signed-in spike passes on a physical HONOR ALI-NX1 (Android 15).
 | Native bearer auth on the Cloudflare Worker | `worker/auth.js` (+ tests) | Deployed; live login/refresh endpoints answer correctly |
 | Shared logic (intent, model, skills, user facts, i18n, PDF/ZIP bytes) | `packages/corez-shared` | Web and mobile import the same modules |
 | Android App Links | `worker/index.js`, `wrangler.jsonc`, `mobile/app.json` | Live and verified on Android 16 (state `1024`) |
-| Release APK | `mobile/build-artifacts/app-release.apk` | 98.18 MB, V2 debug-certificate signed |
+| Release APK | `mobile/build-artifacts/app-release.apk` | 100.2 MB, V2 debug-certificate signed |
 | Build automation | `scripts/mobile/build-apk-windows.ps1` | Validated from a clean directory (641/641 tasks, 12m58s) |
 | Device spike helper | `scripts/mobile/verify-device-spike.ps1` | Validated end-to-end on a physical HONOR ALI-NX1 (install, read-only chat/Stop sampling, relaunch, sign-out) |
 
