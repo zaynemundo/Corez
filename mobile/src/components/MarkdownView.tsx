@@ -59,6 +59,7 @@ export const resolveMarkdownUrl = resolveAssetUrl;
 const ImagePressContext = createContext<((uri: string) => void) | null>(null);
 const CanvasOpenContext = createContext<((html: string) => void) | null>(null);
 const ReviseCodeContext = createContext<((code: string) => void) | null>(null);
+const ReadOnlyContext = createContext(false);
 
 function stripHtml(value: string): string {
   return String(value || "").replace(/<[^>]+>/g, "");
@@ -68,10 +69,12 @@ export function MarkdownView({
   content,
   onReviseCode,
   publishSessionId,
+  readOnly = false,
 }: {
   content: string;
   onReviseCode?: (code: string) => void;
   publishSessionId?: string | null;
+  readOnly?: boolean;
 }) {
   const tokens = useMemo(
     () => parseMarkdown(stripThemeMarkers(content)),
@@ -80,6 +83,7 @@ export function MarkdownView({
   const [fullscreenUri, setFullscreenUri] = useState<string | null>(null);
   const [canvasHtml, setCanvasHtml] = useState<string | null>(null);
   return (
+    <ReadOnlyContext.Provider value={readOnly}>
     <ImagePressContext.Provider value={setFullscreenUri}>
       <CanvasOpenContext.Provider value={setCanvasHtml}>
         <ReviseCodeContext.Provider value={onReviseCode ?? null}>
@@ -104,6 +108,7 @@ export function MarkdownView({
         </ReviseCodeContext.Provider>
       </CanvasOpenContext.Provider>
     </ImagePressContext.Provider>
+    </ReadOnlyContext.Provider>
   );
 }
 
@@ -393,6 +398,7 @@ function CodeBlock({ code, language }: { code: string; language: string }) {
   const colors = theme.colors;
   const openCanvas = useContext(CanvasOpenContext);
   const reviseCode = useContext(ReviseCodeContext);
+  const readOnly = useContext(ReadOnlyContext);
   const [copied, setCopied] = useState(false);
   const resetTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const canPreview = isHtmlLanguage(language) || isRenderableHtml(code);
@@ -420,7 +426,7 @@ function CodeBlock({ code, language }: { code: string; language: string }) {
   };
 
   if (themeProposal) {
-    return <ThemeProposalCard proposal={themeProposal} />;
+    return <ThemeProposalCard proposal={themeProposal} readOnly={readOnly} />;
   }
 
   if (canPreview) {

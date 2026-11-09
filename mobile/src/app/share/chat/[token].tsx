@@ -133,7 +133,7 @@ export default function SharedChatScreen() {
                       ? "COREZ"
                       : message.speakerName || t("shareChat.you")}
                   </Text>
-                  <MarkdownView content={message.content} />
+                  <MarkdownView content={message.content} readOnly />
                 </View>
               ))
             )}

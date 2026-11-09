@@ -39,9 +39,11 @@ const SWATCH_KEYS = [
 export function ThemeProposalCard({
   proposal,
   onApplied,
+  readOnly = false,
 }: {
   proposal: ThemeProposal;
   onApplied?: (theme: CustomTheme) => void;
+  readOnly?: boolean;
 }) {
   const { theme, applyCustomTheme } = useTheme();
   const { t } = useI18n();
@@ -153,7 +155,11 @@ export function ThemeProposalCard({
         </Text>
       ) : null}
 
-      {saved ? (
+      {readOnly ? (
+        <Text style={[styles.hint, { color: colors.textMuted }]}>
+          {t("theme.proposal.readOnly")}
+        </Text>
+      ) : saved ? (
         <View style={styles.savedRow}>
           <Feather name="check" size={15} color={colors.positive} />
           <Text style={[styles.hint, { color: colors.positive }]}>

@@ -420,9 +420,7 @@ export function ChatView({ initialChatId }: ChatViewProps) {
             })}\n\n\`\`\`corez-theme\n${JSON.stringify(proposal)}\n\`\`\``;
           } else {
             const generated = await generateImage({ prompt: commandText });
-            content = `![${t("chat.commands.imageAlt")}](${generated.image})${
-              generated.model ? `\n\n_${generated.model}_` : ""
-            }`;
+            content = `![${t("chat.commands.imageAlt")}](${generated.image})`;
           }
         } catch (caught) {
           content = friendlyError(caught);

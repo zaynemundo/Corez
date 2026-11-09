@@ -242,7 +242,7 @@ function ImageStudio() {
             />
             <View style={styles.resultMeta}>
               <Text style={{ color: colors.textMuted, fontSize: 11.5 }}>
-                {result.model || ""}
+                {t("image.aiGenerated")}
               </Text>
               <Pressable
                 accessibilityRole="button"
