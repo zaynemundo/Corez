@@ -18,6 +18,7 @@ import {
   useFonts as useMonoFonts,
 } from "@expo-google-fonts/jetbrains-mono";
 import { ThemeProvider, useTheme } from "@/state/theme";
+import { UpdateGate } from "@/components/UpdateGate";
 import { useAuth } from "@/state/auth";
 import { hasThemeArtwork, themeWallpaperBase } from "@/theme/customTheme";
 import {
@@ -82,7 +83,8 @@ function RootNavigator() {
   return (
     <>
       <StatusBar style={theme.mode === "light" ? "dark" : "light"} />
-      <View style={[styles.root, { backgroundColor: baseColor }]}>
+      <UpdateGate>
+        <View style={[styles.root, { backgroundColor: baseColor }]}>
         {activeArtwork ? (
           <ImageBackground
             source={{ uri: activeArtwork.uri }}
@@ -96,8 +98,9 @@ function RootNavigator() {
           </ImageBackground>
         ) : (
           navigator
-        )}
-      </View>
+          )}
+        </View>
+      </UpdateGate>
     </>
   );
 }

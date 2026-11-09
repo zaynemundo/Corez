@@ -4,11 +4,12 @@
  * Phase 1 grows this into the full settings modal; the structure already
  * matches the web's (General / Appearance / Account).
  */
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { router } from "expo-router";
 import {
   ActivityIndicator,
   Alert,
+  Linking,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -20,6 +21,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Constants from "expo-constants";
 import { SessionGate } from "@/components/SessionGate";
+import { checkForAppUpdate } from "@/api/appUpdate";
 import { deleteTheme, listThemes, type CustomTheme } from "@/api/themes";
 import { friendlyError } from "@/lib/errors";
 import { useAuth } from "@/state/auth";
@@ -42,6 +44,7 @@ function SettingsView() {
   const { t, language, setLanguage, isRTL } = useI18n();
   const colors = theme.colors;
   const queryClient = useQueryClient();
+  const [checkingUpdates, setCheckingUpdates] = useState(false);
 
   const themesQuery = useQuery({
     queryKey: ["themes"],
@@ -89,6 +92,39 @@ function SettingsView() {
   const applySavedTheme = (entry: CustomTheme) => {
     if (customTheme?.id === entry.id) return;
     applyCustomTheme(entry);
+  };
+  const checkForUpdates = async () => {
+    if (checkingUpdates) return;
+    setCheckingUpdates(true);
+    try {
+      const result = await checkForAppUpdate();
+      if (result.updateAvailable && result.latest) {
+        Alert.alert(
+          t("update.title"),
+          t("update.body"),
+          [
+            { text: t("update.later"), style: "cancel" },
+            {
+              text: t("update.now"),
+              onPress: () => {
+                void Linking.openURL(result.latest!.pageUrl).catch(() => {});
+              },
+            },
+          ],
+        );
+      } else {
+        Alert.alert(
+          t("settings.upToDate"),
+          t("settings.upToDateBody", {
+            version: result.installedVersionName,
+          }),
+        );
+      }
+    } catch {
+      Alert.alert(t("settings.updateCheckFailed"));
+    } finally {
+      setCheckingUpdates(false);
+    }
   };
 
   const themeModes: { id: ThemeMode; label: string }[] = [
@@ -360,6 +396,25 @@ function SettingsView() {
           <Text style={[styles.hint, { color: colors.textMuted }]}>
             React Native client · same account as corez.pro
           </Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t("settings.checkUpdates")}
+            disabled={checkingUpdates}
+            onPress={() => void checkForUpdates()}
+            style={[styles.sitesRow, { borderColor: colors.border }]}
+          >
+            <View style={[styles.rowIcon, { backgroundColor: colors.bgTertiary }]}>
+              <Feather name="download-cloud" size={17} color={colors.textPrimary} />
+            </View>
+            <Text style={[styles.sitesRowLabel, { color: colors.textPrimary }]}>
+              {t("settings.checkUpdates")}
+            </Text>
+            {checkingUpdates ? (
+              <ActivityIndicator size="small" color={colors.textMuted} />
+            ) : (
+              <Feather name="chevron-right" size={18} color={colors.textMuted} />
+            )}
+          </Pressable>
         </Section>
 
         <Pressable

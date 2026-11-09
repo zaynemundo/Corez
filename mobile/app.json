@@ -3,16 +3,18 @@
     "name": "Corez",
     "slug": "corez",
     "scheme": "corez",
-    "version": "0.1.0",
+    "version": "0.1.1",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "pro.corez.app",
-      "buildNumber": "1",
+      "buildNumber": "2",
       "icon": "./assets/icon-ios.png",
-      "associatedDomains": ["applinks:corez.pro"],
+      "associatedDomains": [
+        "applinks:corez.pro"
+      ],
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSPhotoLibraryAddUsageDescription": "Corez saves generated images to your photo library when you ask it to.",
@@ -26,11 +28,26 @@
         {
           "action": "VIEW",
           "autoVerify": true,
-          "category": ["BROWSABLE", "DEFAULT"],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ],
           "data": [
-            { "scheme": "https", "host": "corez.pro", "pathPrefix": "/chat" },
-            { "scheme": "https", "host": "corez.pro", "pathPrefix": "/sites" },
-            { "scheme": "https", "host": "corez.pro", "pathPrefix": "/share/chat" }
+            {
+              "scheme": "https",
+              "host": "corez.pro",
+              "pathPrefix": "/chat"
+            },
+            {
+              "scheme": "https",
+              "host": "corez.pro",
+              "pathPrefix": "/sites"
+            },
+            {
+              "scheme": "https",
+              "host": "corez.pro",
+              "pathPrefix": "/share/chat"
+            }
           ]
         }
       ],
@@ -43,7 +60,8 @@
         "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO",
         "android.permission.READ_MEDIA_IMAGES"
-      ]
+      ],
+      "versionCode": 2
     },
     "web": {
       "favicon": "./assets/favicon.png"

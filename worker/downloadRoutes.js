@@ -6,8 +6,8 @@
 // a download link has to work for someone who has not installed the app yet.
 
 const APK_KEY = "downloads/corez.apk";
-const APK_FILE_NAME = "CoreZ-0.1.0.apk";
-const APK_VERSION = "0.1.0";
+const APK_FILE_NAME = "CoreZ-0.1.1.apk";
+const APK_VERSION = "0.1.1";
 
 function formatBytes(bytes) {
   const value = Number(bytes) || 0;
@@ -77,7 +77,7 @@ function downloadPage({ available, size }) {
       <li><span class="num">2</span><span>Open it and allow <strong>Install unknown apps</strong> for your browser or Files app when Android asks.</span></li>
       <li><span class="num">3</span><span>Open CoreZ and sign in with your account — or create one in the app.</span></li>
     </ol>
-    <p class="note">Sideload test build, signed with the development key. Updates install over it without losing your session. By installing you agree to the <a class="plain" href="/terms">Terms</a> and <a class="plain" href="/privacy">Privacy Policy</a>.</p>
+    <p class="note"><strong>Already have CoreZ installed?</strong> Download this APK and install it over your current app — your chats, themes and sign-in stay. This build adds an in-app update gate, so future releases prompt you before you enter. Sideload test build, signed with the development key. By installing you agree to the <a class="plain" href="/terms">Terms</a> and <a class="plain" href="/privacy">Privacy Policy</a>.</p>
   </main>
 </body>
 </html>`;
@@ -117,6 +117,41 @@ export async function handleDownload(request, env) {
       headers: {
         "content-type": "text/html; charset=utf-8",
         "cache-control": "public, max-age=300",
+        "x-content-type-options": "nosniff",
+      },
+    });
+  }
+
+  if (pathname === "/download/latest.json") {
+    const fallback = {
+      versionName: APK_VERSION,
+      versionCode: 0,
+      apkUrl: "/download/corez.apk",
+      pageUrl: "/download",
+      notes: "",
+      publishedAt: null,
+    };
+    let payload = fallback;
+    try {
+      const stored = await env?.ASSET_BUCKET?.get?.("downloads/latest.json");
+      if (stored) {
+        const parsed = JSON.parse(await stored.text());
+        if (parsed && Number(parsed.versionCode) > 0) {
+          payload = {
+            ...fallback,
+            ...parsed,
+            versionCode: Number(parsed.versionCode),
+          };
+        }
+      }
+    } catch {
+      payload = fallback;
+    }
+    return new Response(JSON.stringify(payload), {
+      status: 200,
+      headers: {
+        "content-type": "application/json",
+        "cache-control": "public, max-age=60",
         "x-content-type-options": "nosniff",
       },
     });

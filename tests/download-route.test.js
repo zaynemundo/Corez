@@ -16,6 +16,16 @@ function fakeBucket({ apk = 'apk-bytes', size = 9, range = null } = {}) {
   };
 }
 
+function fakeMetadataBucket(payload) {
+  return {
+    head: async () => ({ size: 100 }),
+    get: async (key) =>
+      key === 'downloads/latest.json' && payload
+        ? { text: async () => JSON.stringify(payload) }
+        : null,
+  };
+}
+
 describe('Android download route', () => {
   it('serves the landing page with a download link and install steps', async () => {
     const response = await worker.fetch(
@@ -43,7 +53,7 @@ describe('Android download route', () => {
       'application/vnd.android.package-archive',
     );
     expect(response.headers.get('content-disposition')).toContain(
-      'attachment; filename="CoreZ-0.1.0.apk"',
+      'attachment; filename="CoreZ-0.1.1.apk"',
     );
     expect(response.headers.get('content-length')).toBe('9');
     expect(response.headers.get('accept-ranges')).toBe('bytes');
@@ -84,6 +94,38 @@ describe('Android download route', () => {
       {},
     );
     expect(post.status).toBe(405);
+  });
+
+  it('publishes the latest version metadata for the update gate', async () => {
+    const response = await worker.fetch(
+      new Request('https://corez.pro/download/latest.json'),
+      {
+        ASSET_BUCKET: fakeMetadataBucket({
+          versionName: '0.1.1',
+          versionCode: 2,
+          apkUrl: 'https://corez.pro/download/corez.apk',
+          pageUrl: 'https://corez.pro/download',
+          notes: 'Theme artwork and markdown fixes.',
+        }),
+      },
+      {},
+    );
+    expect(response.status).toBe(200);
+    expect(response.headers.get('content-type')).toContain('application/json');
+    const body = await response.json();
+    expect(body.versionCode).toBe(2);
+    expect(body.versionName).toBe('0.1.1');
+    expect(body.pageUrl).toBe('https://corez.pro/download');
+  });
+
+  it('returns a non-triggering fallback when no metadata exists', async () => {
+    const response = await worker.fetch(
+      new Request('https://corez.pro/download/latest.json'),
+      { ASSET_BUCKET: fakeMetadataBucket(null) },
+      {},
+    );
+    expect(response.status).toBe(200);
+    expect((await response.json()).versionCode).toBe(0);
   });
 
   it('fails honestly when the build is not uploaded', async () => {

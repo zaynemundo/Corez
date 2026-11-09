@@ -650,6 +650,7 @@ export default {
       pathname === "/download" ||
       pathname === "/download/" ||
       pathname === "/download/corez.apk" ||
+      pathname === "/download/latest.json" ||
       pathname === "/download/apk"
     ) {
       return handleDownload(request, env);
