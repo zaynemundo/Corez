@@ -473,12 +473,14 @@ describe('PDF generator', () => {
 
   it('folds the download filename too', () => {
     const doc = synthesizePdfDocumentHtml({ title: 'Résumé — Q3 2026', body: 'x', sources: [] });
-    // The filename is derived from the folded title and collapsed to a safe
-    // pattern, so it can never contain a path separator or a mangled character.
-    expect(doc.html).toContain('foldToAscii(REPORT_TITLE).replace(/[^A-Za-z0-9]+/g');
+    // The emitted document reuses the shared reportFileName() helper, whose
+    // fold+slug pattern cannot produce a path separator or a mangled character.
+    expect(doc.html).toContain('a.download = reportFileName(REPORT_TITLE)');
+    expect(doc.html).toContain('function reportFileName(title)');
+    expect(doc.html).toContain('function foldToAscii(t)');
   });
 
-  it('runs the download action end to end and names the file safely', () => {
+  it('runs the download action end to end and names the file safely', async () => {
     const doc = synthesizePdfDocumentHtml({ title: 'Résumé — Q3 2026', body: 'Body.', sources: [] });
     const script = doc.html.match(/<script>([\s\S]*?)<\/script>/)[1];
 
@@ -492,6 +494,9 @@ describe('PDF generator', () => {
       return 'blob:corez-test';
     };
     URL.revokeObjectURL = (url) => revoked.push(url);
+    // The preview-less document tries the Worker renderer first; this test
+    // exercises the offline fallback, so the request fails immediately.
+    vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('offline'); }));
     // This suite runs without a DOM, so the anchor the builder appends to is
     // stubbed: the point is that the click path runs and names the file safely.
     vi.stubGlobal('document', {
@@ -508,6 +513,8 @@ describe('PDF generator', () => {
     try {
       const api = new Function(`${script}\n;return { downloadPdf };`)();
       expect(() => api.downloadPdf()).not.toThrow();
+      // The server request is async; let its rejection reach the fallback.
+      await new Promise((resolve) => setTimeout(resolve, 0));
     } finally {
       vi.unstubAllGlobals();
       URL.createObjectURL = originalCreate;

@@ -27,6 +27,7 @@ import {
 import { handleChats, refreshConversationTitles } from "./chats.js";
 import { handleChatShares } from "./chatShares.js";
 import { handleBrowse } from "./browse.js";
+import { handleReportPdf } from "./reportPdf.js";
 import { handleRuntimeCheck } from "./runtimeCheck.js";
 import { handleProjects } from "./projects.js";
 import { handleN8nWebhook } from "./n8nBridge.js";
@@ -222,6 +223,14 @@ export default {
     if (url.pathname === "/api/runtime-check") {
       const runtimeRes = await handleRuntimeCheck(request, env);
       if (runtimeRes) return withDirectAiCors(runtimeRes);
+    }
+
+    // Research report PDFs. The handler owns its own (anonymous-capable) rate
+    // limit: published reports must be downloadable by anonymous readers, and
+    // the endpoint accepts only validated structured report data.
+    if (url.pathname === "/api/pdf/report") {
+      const pdfRes = await handleReportPdf(request, env);
+      if (pdfRes) return withDirectAiCors(pdfRes);
     }
 
     // Project folders — same pre-gate placement as chats: the handler

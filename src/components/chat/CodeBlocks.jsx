@@ -94,6 +94,7 @@ export function extractUnfencedDeliverable(text) {
 export function CodeSnippetBlock({ code, lang, onRunInCanvas, onReviseCode }) {
   const { t } = useI18n();
   const [copied, setCopied] = useState(false);
+  const [pdfBusy, setPdfBusy] = useState(false);
   // A research report is a document, not a runnable app: its most useful
   // action is saving the PDF, and it should not need the preview first.
   const isReport = useMemo(() => isResearchReportDocument(code), [code]);
@@ -106,11 +107,15 @@ export function CodeSnippetBlock({ code, lang, onRunInCanvas, onReviseCode }) {
     }
   };
 
-  const handleDownloadPdf = () => {
+  const handleDownloadPdf = async () => {
+    if (pdfBusy) return;
+    setPdfBusy(true);
     try {
-      downloadResearchReportPdf(code);
+      await downloadResearchReportPdf(code);
     } catch (err) {
       console.warn("PDF download failed:", err);
+    } finally {
+      setPdfBusy(false);
     }
   };
 
@@ -130,12 +135,15 @@ export function CodeSnippetBlock({ code, lang, onRunInCanvas, onReviseCode }) {
                 fontSize: "0.75rem",
                 borderRadius: "5px",
                 border: "none",
-                cursor: "pointer",
+                cursor: pdfBusy ? "progress" : "pointer",
                 display: "flex",
                 alignItems: "center",
                 gap: "0.35rem",
+                opacity: pdfBusy ? 0.7 : 1,
               }}
               onClick={handleDownloadPdf}
+              disabled={pdfBusy}
+              aria-busy={pdfBusy}
               title={t("chat.message.code.downloadPdfTitle")}
             >
               <Download size={13} strokeWidth={2} />
@@ -209,15 +217,20 @@ export function CodeSnippetBlock({ code, lang, onRunInCanvas, onReviseCode }) {
 
 export function ExecutableCodeBlock({ code, onRunInCanvas, onReviseCode }) {
   const { t } = useI18n();
+  const [pdfBusy, setPdfBusy] = useState(false);
   // A research report is a document deliverable: saving its PDF is the primary
   // action, so the button comes first and does not require the preview.
   const isReport = useMemo(() => isResearchReportDocument(code), [code]);
 
-  const handleDownloadPdf = () => {
+  const handleDownloadPdf = async () => {
+    if (pdfBusy) return;
+    setPdfBusy(true);
     try {
-      downloadResearchReportPdf(code);
+      await downloadResearchReportPdf(code);
     } catch (err) {
       console.warn("PDF download failed:", err);
+    } finally {
+      setPdfBusy(false);
     }
   };
 
@@ -244,15 +257,18 @@ export function ExecutableCodeBlock({ code, onRunInCanvas, onReviseCode }) {
             fontSize: "0.875rem",
             borderRadius: "var(--radius-md, 12px)",
             border: "none",
-            cursor: "pointer",
+            cursor: pdfBusy ? "progress" : "pointer",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
             gap: "0.5rem",
             boxShadow: "none",
             transition: "var(--transition-fast)",
+            opacity: pdfBusy ? 0.7 : 1,
           }}
           onClick={handleDownloadPdf}
+          disabled={pdfBusy}
+          aria-busy={pdfBusy}
           title={t("chat.message.code.downloadPdfTitle")}
         >
           <Download size={16} strokeWidth={2} />

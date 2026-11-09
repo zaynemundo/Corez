@@ -323,20 +323,52 @@ ${builderSource}
 
   // Alias kept for callers/tests that exercise the builder by name. The
   // builder returns bytes (React Native has no Blob), so the browser wraps
-  // them here.
+  // them here. This local build is the offline fallback: base-14 Helvetica can
+  // only draw ASCII, so report text in Arabic/CJK/Cyrillic is folded away.
   function buildPdf(){ return new Blob([buildResearchPdfBytes(REPORT_TITLE, REPORT_PARAGRAPHS, HELVETICA_WIDTHS)], { type: 'application/pdf' }); }
-  function downloadPdf(){
-    var blob = buildPdf();
+  function saveBlob(blob){
     var url = URL.createObjectURL(blob);
     var a = document.createElement('a');
-    // A folded, filesystem-safe name: runs of punctuation collapse to one dash
-    // and the ends are trimmed, so "Résumé — Q3 2026" becomes Resume-Q3-2026.pdf
-    // rather than Resume---Q3-2026.pdf.
-    var name = foldToAscii(REPORT_TITLE).replace(/[^A-Za-z0-9]+/g,'-').replace(/^-+|-+$/g,'');
-    a.href = url; a.download = (name || 'research-report').slice(0,80) + '.pdf';
+    a.href = url;
+    // reportFileName() folds and slugifies the title, so "Résumé — Q3 2026"
+    // becomes Resume-Q3-2026.pdf rather than Resume---Q3-2026.pdf.
+    a.download = reportFileName(REPORT_TITLE);
     document.body.appendChild(a); a.click();
     if (a.remove) a.remove();
     setTimeout(function(){ URL.revokeObjectURL(url); }, 4000);
+  }
+  function localDownloadPdf(){ saveBlob(buildPdf()); }
+  function downloadPdf(){
+    var payload = { title: REPORT_TITLE, paragraphs: REPORT_PARAGRAPHS };
+    // Inside the in-app preview the download must run in the top-level app:
+    // some browsers refuse blob downloads from a sandboxed iframe, and the
+    // top-level path can also reach the Worker for a Unicode PDF.
+    if (typeof window !== 'undefined' && window.parent && window.parent !== window) {
+      try {
+        window.parent.postMessage({ type: 'corez-pdf-download', payload: payload }, '*');
+        return;
+      } catch (err) {}
+    }
+    // Published report page: ask the Worker to print it in a real browser so
+    // Arabic, CJK and other non-Latin scripts render instead of being folded
+    // out by the local ASCII builder.
+    if (typeof fetch === 'function') {
+      try {
+        fetch('/api/pdf/report', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
+          body: JSON.stringify(payload)
+        }).then(function (response) {
+          if (!response.ok) throw new Error('pdf render failed: ' + response.status);
+          return response.blob();
+        }).then(function (blob) {
+          saveBlob(blob);
+        }).catch(localDownloadPdf);
+        return;
+      } catch (err) {}
+    }
+    localDownloadPdf();
   }
 </script>
 </body>

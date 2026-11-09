@@ -12,6 +12,7 @@ import { createZipBlob } from "@corez_ai/shared/artifacts";
 import { repairMalformedHtml } from "../utils/htmlRepair";
 import { printHtmlDocument } from "../utils/printDocument";
 import { inlinePreviewAssets } from "../utils/previewAssets";
+import { downloadReportPdfFromData } from "../services/pdfDownload.js";
 import { generateEmbedSnippet } from "../utils/qrCode";
 import { useI18n } from "../i18n/index.jsx";
 import { CanvasHeader } from "./canvas/CanvasHeader.jsx";
@@ -221,6 +222,20 @@ export default function CanvasPreview({
       if (event.source !== iframeRef.current?.contentWindow) return;
       const data = event.data;
       if (!data || typeof data !== "object") return;
+      if (data.type === "corez-pdf-download") {
+        // A research report's in-preview "Download .pdf" button forwards its
+        // structured data here. The download runs in the top-level app, which
+        // can request the Worker's Unicode-capable PDF; sandboxed iframes are
+        // blocked from blob downloads in some browsers.
+        const payload = data.payload;
+        if (payload && typeof payload === "object") {
+          downloadReportPdfFromData({
+            title: payload.title,
+            paragraphs: payload.paragraphs,
+          }).catch(() => {});
+        }
+        return;
+      }
       // Runtime/resource failures reported by the preview error reporter
       // (previewTransformer) so a blank frame explains itself.
       if (data.type === "corez-preview-error") {

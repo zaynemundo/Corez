@@ -5,8 +5,10 @@
   "compatibility_date": "2026-07-18",
   "compatibility_flags": ["nodejs_compat"],
   "workers_dev": true,
-  // Browser Run Quick Actions (URL -> Markdown). Requires a Workers Paid plan
-  // and Browser Run enabled on the account.
+  // Browser Run: URL -> Markdown Quick Actions, runtime verification of
+  // generated pages, and the Unicode-capable research report PDF renderer
+  // (POST /api/pdf/report). Requires a Workers Paid plan and Browser Run
+  // enabled on the account.
   "browser": {
     "binding": "BROWSER"
   },

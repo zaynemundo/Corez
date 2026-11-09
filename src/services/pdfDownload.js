@@ -2,17 +2,22 @@
  * One-click PDF download for research reports.
  *
  * The /research command returns a self-contained report document whose script
- * carries `var REPORT_TITLE` and `var REPORT_PARAGRAPHS`. The document's own
- * "Download .pdf" button works inside the preview, but the user had to open
- * the canvas first — the shortest path is a download button right in the chat
- * message. This module extracts the embedded report data and runs the SAME
- * builder the document uses (src/services/pdfBuilder.js), so both paths
- * produce byte-identical PDFs.
+ * carries `var REPORT_TITLE` and `var REPORT_PARAGRAPHS`. This module extracts
+ * that data and asks the Worker to print it to PDF in a real browser
+ * (`POST /api/pdf/report`), so Arabic, CJK, Cyrillic and emoji text survive —
+ * the local builder draws with base-14 Helvetica and can only represent ASCII.
+ *
+ * The local builder is kept as an offline/fallback path: it is instant, needs
+ * no request, and still produces the correct document for Latin report text
+ * when the server renderer is unreachable or rate limited.
  */
 import { buildResearchPdfBlob, reportFileName } from "@corez_ai/shared/artifacts";
 
+export const REPORT_PDF_ENDPOINT = "/api/pdf/report";
+const REPORT_PDF_REQUEST_TIMEOUT_MS = 30_000;
+
 // The wrapper injects the widths table into the document; the module keeps its
-// own copy for chat-side builds. Kept in sync with pdfGenerator.js.
+// own copy for the fallback build. Kept in sync with pdfGenerator.js.
 const HELVETICA_WIDTHS = [
   278, 278, 355, 556, 556, 889, 667, 191, 333, 333, 389, 584, 278, 333, 278, 278,
   556, 556, 556, 556, 556, 556, 556, 556, 556, 556,
@@ -94,22 +99,79 @@ export function extractResearchReportData(code) {
   return { title: String(title || "Research Report"), paragraphs };
 }
 
-/**
- * Build the report PDF and trigger a download from the top-level document.
- * Returns true when a download was started; false when the artifact is not a
- * research report (callers hide the button in that case).
- */
-export function downloadResearchReportPdf(code) {
-  const data = extractResearchReportData(code);
-  if (!data) return false;
-  const blob = buildResearchPdfBlob(data.title, data.paragraphs, HELVETICA_WIDTHS);
+function triggerBlobDownload(blob, fileName) {
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   anchor.href = url;
-  anchor.download = reportFileName(data.title);
+  anchor.download = fileName;
   document.body.appendChild(anchor);
   anchor.click();
   if (anchor.remove) anchor.remove();
   setTimeout(() => URL.revokeObjectURL(url), 4000);
+}
+
+async function requestServerPdf(payload) {
+  if (typeof navigator !== "undefined" && navigator.onLine === false) {
+    return null;
+  }
+  const controller = new AbortController();
+  const timer = setTimeout(
+    () => controller.abort(),
+    REPORT_PDF_REQUEST_TIMEOUT_MS,
+  );
+  try {
+    const response = await fetch(REPORT_PDF_ENDPOINT, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "same-origin",
+      signal: controller.signal,
+      body: JSON.stringify(payload),
+    });
+    if (!response.ok) return null;
+    const blob = await response.blob();
+    return blob && blob.size > 0 ? blob : null;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * Save a report as a PDF. Tries the Worker's browser-rendered PDF first (full
+ * Unicode), then falls back to the local ASCII builder.
+ *
+ * @returns {Promise<boolean>} true when a download was started; false when the
+ *   data is not a report (callers hide the button in that case).
+ */
+export async function downloadReportPdfFromData(data) {
+  if (!data || !Array.isArray(data.paragraphs) || data.paragraphs.length === 0) {
+    return false;
+  }
+  const payload = {
+    title: String(data.title || "Research Report"),
+    paragraphs: data.paragraphs,
+  };
+  const fileName = reportFileName(payload.title);
+
+  const serverBlob = await requestServerPdf(payload);
+  if (serverBlob) {
+    triggerBlobDownload(serverBlob, fileName);
+    return true;
+  }
+
+  const blob = buildResearchPdfBlob(
+    payload.title,
+    payload.paragraphs,
+    HELVETICA_WIDTHS,
+  );
+  triggerBlobDownload(blob, fileName);
   return true;
+}
+
+/** Extract report data from an artifact and download it as a PDF. */
+export async function downloadResearchReportPdf(code) {
+  const data = extractResearchReportData(code);
+  if (!data) return false;
+  return downloadReportPdfFromData(data);
 }
