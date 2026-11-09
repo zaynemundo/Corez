@@ -1,5 +1,10 @@
 import type { CustomTheme } from "@/api/themes";
-import { isCustomTheme, themeFromCustomTheme } from "../customTheme";
+import {
+  hasThemeArtwork,
+  isCustomTheme,
+  themeFromCustomTheme,
+  themeWallpaperBase,
+} from "../customTheme";
 import { darkTheme } from "../tokens";
 
 const theme: CustomTheme = {
@@ -55,6 +60,33 @@ describe("custom theme mapping", () => {
     });
     expect(mapped.mode).toBe("light");
     expect(mapped.colors.bgPrimary).toBe("#fafafa");
+  });
+
+  it("uses the Worker's translucent image-mode surfaces when artwork exists", () => {
+    const imageTheme: CustomTheme = {
+      ...theme,
+      images: {
+        mobile: "/api/assets/uid/phone.png",
+        desktop: "/api/assets/uid/desktop.png",
+      },
+      tokens: {
+        solid: { ...theme.tokens.solid },
+        image: {
+          "--theme-scrim": "rgba(16, 16, 16, 0.22)",
+          "--theme-panel-bg": "rgba(26, 26, 26, 0.76)",
+          "--theme-panel-strong-bg": "rgba(16, 16, 16, 0.9)",
+          "--theme-message-bg": "rgba(26, 26, 26, 0.68)",
+        },
+      },
+    };
+    const mapped = themeFromCustomTheme(imageTheme);
+    expect(hasThemeArtwork(imageTheme)).toBe(true);
+    expect(mapped.colors.bgPrimary).toBe("rgba(16, 16, 16, 0.9)");
+    expect(mapped.colors.bgCard).toBe("rgba(26, 26, 26, 0.76)");
+    expect(mapped.colors.userBubble).toBe("rgba(26, 26, 26, 0.68)");
+    expect(themeWallpaperBase(imageTheme, "#000")).toBe("#101010");
+    expect(hasThemeArtwork(theme)).toBe(false);
+    expect(themeWallpaperBase(null, "#000")).toBe("#000");
   });
 
   it("recognises cached theme objects", () => {

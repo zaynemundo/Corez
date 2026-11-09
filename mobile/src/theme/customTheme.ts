@@ -33,6 +33,23 @@ function withAlpha(value: string, alpha: number): string {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
+export function hasThemeArtwork(custom: CustomTheme | null): boolean {
+  return Boolean(custom?.images?.mobile || custom?.images?.desktop);
+}
+
+/**
+ * Opaque colour painted under the wallpaper (and used as the whole background
+ * when the theme has no artwork). Keeping it separate from the mapped
+ * `bgPrimary` matters because image themes make the normal surfaces translucent.
+ */
+export function themeWallpaperBase(
+  custom: CustomTheme | null,
+  fallback: string,
+): string {
+  const value = custom?.tokens?.solid?.["--bg-primary"];
+  return typeof value === "string" && value.trim() ? value : fallback;
+}
+
 export function themeFromCustomTheme(custom: CustomTheme): Theme {
   const base = custom.tone === "light" ? lightTheme : darkTheme;
   const tokens = custom.tokens?.solid || {};
@@ -42,6 +59,12 @@ export function themeFromCustomTheme(custom: CustomTheme): Theme {
   };
 
   const textPrimary = pick("--text-primary", base.colors.textPrimary);
+  const imageMode = hasThemeArtwork(custom);
+  const imageTokens = custom.tokens?.image || {};
+  const pickImage = (key: string, fallback: string): string => {
+    const value = imageTokens[key];
+    return typeof value === "string" && value.trim() ? value : fallback;
+  };
   const colors: ThemeColors = {
     ...base.colors,
     bgPrimary: pick("--bg-primary", base.colors.bgPrimary),
@@ -72,6 +95,21 @@ export function themeFromCustomTheme(custom: CustomTheme): Theme {
     userBubble: withAlpha(textPrimary, 0.12),
     userBubbleBorder: withAlpha(textPrimary, 0.2),
   };
+
+  if (imageMode) {
+    // The Worker solves translucent reading surfaces against the wallpaper's
+    // worst-case brightness; use them so text stays readable over the picture.
+    const panel = pickImage("--theme-panel-bg", colors.bgSecondary);
+    const strong = pickImage("--theme-panel-strong-bg", colors.bgPrimary);
+    const message = pickImage("--theme-message-bg", colors.bgCard);
+    colors.bgPrimary = strong;
+    colors.bgSecondary = panel;
+    colors.bgCard = panel;
+    colors.bgTertiary = message;
+    colors.bgGlass = panel;
+    colors.userBubble = message;
+    colors.userBubbleBorder = withAlpha(textPrimary, 0.2);
+  }
 
   return {
     mode: custom.tone,

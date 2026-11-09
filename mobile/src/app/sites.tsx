@@ -168,7 +168,7 @@ function SitesView() {
 
   return (
     <SafeAreaView
-      style={[styles.safe, { backgroundColor: colors.bgPrimary }]}
+      style={styles.safe}
       edges={["top", "bottom"]}
     >
       <View style={[styles.header, { borderBottomColor: colors.border }]}>

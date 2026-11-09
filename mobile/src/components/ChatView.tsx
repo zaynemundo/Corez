@@ -689,7 +689,7 @@ export function ChatView({ initialChatId }: ChatViewProps) {
 
   return (
     <KeyboardAvoidingView
-      style={[styles.screen, { backgroundColor: colors.bgPrimary }]}
+      style={styles.screen}
       behavior={Platform.OS === "ios" ? "padding" : "height"}
       keyboardVerticalOffset={0}
     >
