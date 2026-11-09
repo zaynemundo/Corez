@@ -40,8 +40,9 @@ const BLOCK_KINDS = new Set([
 
 // One PDF is one browser session, so the anonymous path must be bounded: a
 // published report is readable by anyone, and its download button uses this
-// route too. Six per minute per client leaves normal readers unaffected.
-const reportPdfRateLimiter = createRateLimiter({ windowMs: 60_000, limit: 6 });
+// route too. Twelve per minute keeps a shared office/NAT network from tripping
+// the limit while still capping browser usage from a single client.
+const reportPdfRateLimiter = createRateLimiter({ windowMs: 60_000, limit: 12 });
 
 function cleanText(value) {
   return String(value ?? "")

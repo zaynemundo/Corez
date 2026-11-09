@@ -207,7 +207,7 @@ describe('handleReportPdf', () => {
 
   it('rate limits repeated renders per client', async () => {
     const env = {}; // no browser: each allowed request answers 503
-    for (let i = 0; i < 6; i += 1) {
+    for (let i = 0; i < 12; i += 1) {
       const response = await handleReportPdf(
         reportRequest(REPORT, { ip: '203.0.113.77' }),
         env,
