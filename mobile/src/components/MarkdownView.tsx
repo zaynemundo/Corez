@@ -188,6 +188,21 @@ function Block({ token }: { token: Token }) {
       return <TableBlock token={token as unknown as TableToken} />;
     case "hr":
       return <View style={[styles.hr, { backgroundColor: colors.border }]} />;
+    case "text": {
+      // `marked` wraps inline content (bold, links, code spans) in a `text`
+      // token inside list items; render it through the inline walker instead of
+      // falling back to the raw markdown source.
+      const textToken = token as { text?: string; tokens?: Token[] };
+      return (
+        <Text style={[styles.paragraph, { color: colors.textPrimary }]}>
+          {textToken.tokens && textToken.tokens.length > 0 ? (
+            <Inline tokens={textToken.tokens} />
+          ) : (
+            textToken.text || ""
+          )}
+        </Text>
+      );
+    }
     case "html":
       return (
         <Text style={[styles.paragraph, { color: colors.textMuted }]}>

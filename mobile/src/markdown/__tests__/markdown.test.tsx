@@ -172,4 +172,13 @@ describe("MarkdownView rendering", () => {
     expect(screen.getByText("Use colors")).toBeTruthy();
     expect(screen.queryByText(/proposalId/)).toBeNull();
   });
+
+  it("renders inline markdown inside list items without literal asterisks", async () => {
+    await renderMarkdown(
+      "- **Long-form reasoning** — give me a multi-step problem.\n- **Code generation** — ask for a component.",
+    );
+    expect(screen.getByText("Long-form reasoning")).toBeTruthy();
+    expect(screen.getByText("Code generation")).toBeTruthy();
+    expect(screen.queryByText(/\*\*/)).toBeNull();
+  });
 });
