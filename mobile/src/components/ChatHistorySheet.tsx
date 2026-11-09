@@ -31,6 +31,7 @@ import {
 } from "@/api/chats";
 import { useAuth } from "@/state/auth";
 import { useTheme } from "@/state/theme";
+import { themeWallpaperBase } from "@/theme/customTheme";
 import { useI18n } from "@/i18n";
 import { friendlyError } from "@/lib/errors";
 
@@ -54,7 +55,7 @@ export function ChatHistorySheet({
   onNewChat,
   onDeleted,
 }: ChatHistorySheetProps) {
-  const { theme } = useTheme();
+  const { theme, customTheme } = useTheme();
   const { t } = useI18n();
   const colors = theme.colors;
   const insets = useSafeAreaInsets();
@@ -211,7 +212,10 @@ export function ChatHistorySheet({
             style={[
               styles.sheet,
               {
-                backgroundColor: colors.bgPrimary,
+                backgroundColor: themeWallpaperBase(
+                  customTheme,
+                  colors.bgPrimary,
+                ),
                 borderColor: colors.border,
                 paddingTop: insets.top + 8,
                 paddingBottom: insets.bottom + 10,

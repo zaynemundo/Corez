@@ -37,6 +37,8 @@ import {
   getChatWithCache,
 } from "@/api/chats";
 import { createChatShare } from "@/api/shareChat";
+import { proposeTheme } from "@/api/themes";
+import { generateImage } from "@/api/images";
 import {
   buildAttachmentPrompt,
   pickAttachment,
@@ -370,6 +372,87 @@ export function ChatView({ initialChatId }: ChatViewProps) {
       }
       setOfflineNotice(false);
 
+      const commandMatch = /^@(website|game|research|image|theme)\b\s*([\s\S]*)$/i.exec(
+        prompt,
+      );
+      const commandId = commandMatch?.[1]?.toLowerCase();
+      const commandText = (commandMatch?.[2] || "").trim();
+      if (commandId === "theme" || commandId === "image") {
+        const now = Date.now();
+        const assistantId = `a-${now}`;
+        const userMessage: ChatMessageModel = {
+          id: `u-${now}`,
+          role: "user",
+          content: prompt,
+          ...(displayAttachments.length > 0
+            ? { attachments: displayAttachments }
+            : {}),
+        };
+        const assistantMessage: ChatMessageModel = {
+          id: assistantId,
+          role: "assistant",
+          content: "",
+          thinking: t("chat.commands.working"),
+          streaming: true,
+        };
+        publishMessages((prev) => [...prev, userMessage, assistantMessage]);
+        setInput("");
+        setAttachments([]);
+        setAttachmentError(null);
+        setStreaming(true);
+        startedAtRef.current = Date.now();
+        stopTimer();
+        timerRef.current = setInterval(() => {
+          setElapsedMs(Date.now() - startedAtRef.current);
+        }, 250);
+
+        let content = "";
+        try {
+          if (!commandText) {
+            content =
+              commandId === "theme"
+                ? t("chat.commands.themeHint")
+                : t("chat.commands.imageHint");
+          } else if (commandId === "theme") {
+            const proposal = await proposeTheme(commandText);
+            content = `${t("chat.commands.themeReady", {
+              name: proposal.name,
+            })}\n\n\`\`\`corez-theme\n${JSON.stringify(proposal)}\n\`\`\``;
+          } else {
+            const generated = await generateImage({ prompt: commandText });
+            content = `![${t("chat.commands.imageAlt")}](${generated.image})${
+              generated.model ? `\n\n_${generated.model}_` : ""
+            }`;
+          }
+        } catch (caught) {
+          content = friendlyError(caught);
+        }
+
+        patchMessage(assistantId, {
+          content,
+          thinking: "",
+          streaming: false,
+          thinkingSeconds: Math.max(
+            0,
+            Math.round((Date.now() - startedAtRef.current) / 1000),
+          ),
+        });
+        stopTimer();
+        setElapsedMs(0);
+        setStreaming(false);
+        abortRef.current = null;
+        if (activeChatId && content.trim()) {
+          await appendMessage(activeChatId, {
+            role: "assistant",
+            content,
+          }).catch(() => {});
+        }
+        if (createdThisTurn && activeChatId) {
+          router.replace(`/chat/${activeChatId}`);
+        }
+        return;
+      }
+
       if (conversation) {
         const now = Date.now();
         const userMessage: ChatMessageModel = {
@@ -702,28 +785,28 @@ export function ChatView({ initialChatId }: ChatViewProps) {
           },
         ]}
       >
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={t("chat.history.title")}
-          onPress={() => setHistoryOpen(true)}
-          hitSlop={12}
-          style={[styles.headerButton, { backgroundColor: colors.bgTertiary }]}
-        >
-          <Feather name="menu" size={20} color={colors.textPrimary} />
-        </Pressable>
-        <View style={styles.brandWrap}>
-          <View style={styles.headerText}>
-            {chatTitle ? (
-              <Text
-                numberOfLines={1}
-                style={[styles.chatTitle, { color: colors.textSecondary }]}
-              >
-                {chatTitle}
-              </Text>
-            ) : null}
-          </View>
+        <View style={styles.headerSide}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t("chat.history.title")}
+            onPress={() => setHistoryOpen(true)}
+            hitSlop={12}
+            style={[styles.headerButton, { backgroundColor: colors.bgTertiary }]}
+          >
+            <Feather name="menu" size={20} color={colors.textPrimary} />
+          </Pressable>
         </View>
-        <View style={styles.headerActions}>
+        <View style={styles.headerCenter}>
+          {chatTitle ? (
+            <Text
+              numberOfLines={1}
+              style={[styles.chatTitle, { color: colors.textSecondary }]}
+            >
+              {chatTitle}
+            </Text>
+          ) : null}
+        </View>
+        <View style={[styles.headerSide, styles.headerSideRight]}>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={t("chat.share.action")}
@@ -806,30 +889,35 @@ export function ChatView({ initialChatId }: ChatViewProps) {
                   key: "website",
                   icon: "layout" as const,
                   label: t("home.starters.website"),
+                  command: "website",
                   conversation: false,
                 },
                 {
                   key: "game",
                   icon: "zap" as const,
                   label: t("home.starters.game"),
+                  command: "game",
                   conversation: false,
                 },
                 {
                   key: "image",
                   icon: "image" as const,
                   label: t("home.starters.image"),
+                  command: "image",
                   conversation: false,
                 },
                 {
                   key: "research",
                   icon: "search" as const,
                   label: t("home.starters.research"),
+                  command: "research",
                   conversation: false,
                 },
                 {
                   key: "conversation",
                   icon: "users" as const,
                   label: t("home.starters.conversation"),
+                  command: null,
                   conversation: true,
                 },
               ].map((starter) => (
@@ -842,7 +930,7 @@ export function ChatView({ initialChatId }: ChatViewProps) {
                       router.push("/conversation/new");
                       return;
                     }
-                    setInput(`${starter.label}: `);
+                    setInput(`@${starter.command} `);
                   }}
                   style={({ pressed }) => [
                     starter.conversation ? styles.starterWide : styles.starterCard,
@@ -953,23 +1041,26 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  brandWrap: {
-    flex: 1,
-    minWidth: 0,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 0,
+  headerSide: {
+    width: 46,
+    alignItems: "flex-start",
+    justifyContent: "center",
   },
-  headerText: {
+  headerSideRight: {
+    alignItems: "flex-end",
+  },
+  headerCenter: {
     flex: 1,
     minWidth: 0,
-    flexDirection: "row",
-    alignItems: "baseline",
-    gap: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 8,
   },
   chatTitle: {
     flexShrink: 1,
-    fontSize: 13,
+    fontSize: 14,
+    fontWeight: "600",
+    textAlign: "center",
   },
   headerButton: {
     width: 38,

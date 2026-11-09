@@ -22,14 +22,30 @@ export async function generateImage(input: {
   if (prompt.length > 2_000) {
     throw new Error("The prompt is too long (2,000 characters max).");
   }
-  const data = await requestJson<GeneratedImage>("/api/image", {
-    method: "POST",
-    body: {
-      prompt,
-      ...(input.model ? { model: input.model } : {}),
-    },
-    timeoutMs: 120_000,
-  });
+  const body = {
+    prompt,
+    ...(input.model ? { model: input.model } : {}),
+  };
+  let data: GeneratedImage;
+  try {
+    data = await requestJson<GeneratedImage>("/api/image", {
+      method: "POST",
+      body,
+      timeoutMs: 120_000,
+    });
+  } catch (primaryError) {
+    // Workers AI FLUX (/api/image/cf) is the keyless provider; it keeps image
+    // generation available on deployments without an OpenRouter key.
+    try {
+      data = await requestJson<GeneratedImage>("/api/image/cf", {
+        method: "POST",
+        body,
+        timeoutMs: 120_000,
+      });
+    } catch {
+      throw primaryError;
+    }
+  }
   if (!data?.image) throw new Error("The image request returned no image.");
   return data;
 }

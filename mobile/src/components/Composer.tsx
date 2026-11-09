@@ -24,6 +24,7 @@ import { useI18n } from "@/i18n";
 import type { Attachment, AttachmentSource } from "@/lib/attachments";
 import type { DictationStatus } from "@/hooks/useDictation";
 import { resolveComposerAction } from "@/lib/composerAction";
+import { commandSuggestionsFor } from "@/lib/commands";
 
 interface ComposerProps {
   value: string;
@@ -72,7 +73,9 @@ export const Composer = forwardRef<TextInputInstance, ComposerProps>(
     const hasContent =
       value.trim().length > 0 || attachments.length > 0;
     const canSend = hasContent && !streaming;
-    const action = resolveComposerAction({
+    const commandSuggestions = commandSuggestionsFor(value);
+
+  const action = resolveComposerAction({
       streaming,
       hasContent,
       dictationStatus,
@@ -145,6 +148,44 @@ export const Composer = forwardRef<TextInputInstance, ComposerProps>(
             >
               {attachmentError || dictationError}
             </Text>
+          ) : null}
+
+          {commandSuggestions ? (
+            <View
+              style={[
+                styles.commandPanel,
+                { backgroundColor: colors.bgCard, borderColor: colors.border },
+              ]}
+            >
+              {commandSuggestions.map((command) => (
+                <Pressable
+                  key={command.id}
+                  accessibilityRole="button"
+                  accessibilityLabel={`@${command.token} ${t(command.descriptionKey)}`}
+                  onPress={() => {
+                    onChangeText(`@${command.token} `);
+                    if (ref && typeof ref !== "function") {
+                      ref.current?.focus?.();
+                    }
+                  }}
+                  style={({ pressed }) => [
+                    styles.commandRow,
+                    { opacity: pressed ? 0.7 : 1 },
+                  ]}
+                >
+                  <Feather name={command.icon} size={15} color={colors.textSecondary} />
+                  <Text style={[styles.commandToken, { color: colors.textPrimary }]}>
+                    @{command.token}
+                  </Text>
+                  <Text
+                    numberOfLines={1}
+                    style={[styles.commandDesc, { color: colors.textMuted }]}
+                  >
+                    {t(command.descriptionKey)}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
           ) : null}
 
           <View
@@ -328,6 +369,22 @@ export const Composer = forwardRef<TextInputInstance, ComposerProps>(
 
 const styles = StyleSheet.create({
   wrapper: { gap: 8 },
+  commandPanel: {
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 14,
+    padding: 6,
+    gap: 2,
+  },
+  commandRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    minHeight: 42,
+    paddingHorizontal: 8,
+    borderRadius: 10,
+  },
+  commandToken: { fontSize: 13, fontWeight: "700" },
+  commandDesc: { flex: 1, fontSize: 12 },
   tray: { gap: 8, paddingHorizontal: 2 },
   chip: {
     flexDirection: "row",

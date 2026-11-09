@@ -87,3 +87,21 @@ export async function applyThemeProposal(
   if (!data.theme?.id) throw new Error("The theme could not be saved.");
   return data.theme;
 }
+
+/** Ask the Worker's theme designer for a new proposal (used by @theme). */
+export async function proposeTheme(prompt: string): Promise<ThemeProposal> {
+  const value = String(prompt || "").trim();
+  if (!value) throw new Error("Describe the theme you want.");
+  const data = await requestJson<{ proposal?: ThemeProposal }>(
+    "/api/themes/propose",
+    {
+      method: "POST",
+      body: { prompt: value },
+      timeoutMs: 180_000,
+    },
+  );
+  if (!data.proposal?.proposalId) {
+    throw new Error("The theme designer did not return a proposal.");
+  }
+  return data.proposal;
+}
