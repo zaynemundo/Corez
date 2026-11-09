@@ -51,6 +51,7 @@ live SSE streaming, abort, and the release APK build before Phase 1 starts.
 
 | iOS: Expo target configured (bundle id, opaque 1024 icon, associated domains, Info.plist usage strings), AASA endpoint added, iOS Hermes bundle verified; EAS build profiles ready | Configured; an installable build needs an Apple Developer account |
 | Download page: `corez.pro/download` landing page + `corez.pro/download/corez.apk` streams the sideload APK from R2 with byte-range support | Done |
+| Slim public build: `https://corez.pro/download` now serves the **arm64-only** APK (38.3 MB / 36.5 MiB, versionCode 10) for modern phones; `mobile/build-artifacts/app-release-universal-v9.apk` keeps the universal build for the x86_64 emulator. Build the slim APK with `gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a`; no app features differ, only the unused 32-bit/x86 native libraries are dropped | Done |
 | Sideload updates: `GET /download/latest.json` publishes the current build; Android compares `expo-application` nativeBuildVersion with it, shows an **Update available** gate before entry (Update now opens the download page, Continue dismisses for the session) and Settings has a manual “Check for updates”. `android.versionCode` must be bumped for every release | Done |
 
 ## Shared package (`packages/corez-shared`)

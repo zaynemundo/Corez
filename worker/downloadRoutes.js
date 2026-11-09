@@ -69,7 +69,7 @@ function downloadPage({ available, size }) {
     <div class="meta">
       <span class="pill">Version ${escapeHtml(APK_VERSION)}</span>
       <span class="pill">${escapeHtml(formatBytes(size))}</span>
-      <span class="pill">Android 8.0+</span>
+      <span class="pill">Android 8+ · 64-bit</span>
     </div>
     ${button}
     <ol class="steps">
@@ -77,7 +77,7 @@ function downloadPage({ available, size }) {
       <li><span class="num">2</span><span>Open it and allow <strong>Install unknown apps</strong> for your browser or Files app when Android asks.</span></li>
       <li><span class="num">3</span><span>Open CoreZ and sign in with your account — or create one in the app.</span></li>
     </ol>
-    <p class="note"><strong>Already have CoreZ installed?</strong> Download this APK and install it over your current app — your chats, themes and sign-in stay. This build adds an in-app update gate, so future releases prompt you before you enter. Sideload test build, signed with the development key. By installing you agree to the <a class="plain" href="/terms">Terms</a> and <a class="plain" href="/privacy">Privacy Policy</a>.</p>
+    <p class="note">This is the slim build for modern Android phones (arm64, 64-bit). Very old 32-bit-only devices are no longer supported. <strong>Already have CoreZ installed?</strong> Download this APK and install it over your current app — your chats, themes and sign-in stay. This build adds an in-app update gate, so future releases prompt you before you enter. Sideload test build, signed with the development key. By installing you agree to the <a class="plain" href="/terms">Terms</a> and <a class="plain" href="/privacy">Privacy Policy</a>.</p>
   </main>
 </body>
 </html>`;
