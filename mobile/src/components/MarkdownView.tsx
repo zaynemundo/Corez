@@ -119,12 +119,27 @@ function Block({ token }: { token: Token }) {
   switch (token.type) {
     case "space":
       return null;
-    case "paragraph":
+    case "paragraph": {
+      const paragraphTokens =
+        (token as { tokens?: Token[] }).tokens || [];
+      if (
+        paragraphTokens.length === 1 &&
+        paragraphTokens[0]?.type === "image"
+      ) {
+        const image = paragraphTokens[0] as { href?: string; text?: string };
+        return (
+          <ImageBlock
+            src={String(image.href || "")}
+            alt={String(image.text || "")}
+          />
+        );
+      }
       return (
         <Text style={[styles.paragraph, { color: colors.textPrimary }]}>
-          <Inline tokens={(token as { tokens?: Token[] }).tokens} />
+          <Inline tokens={paragraphTokens} />
         </Text>
       );
+    }
     case "heading": {
       const depth = Number((token as { depth?: number }).depth) || 1;
       const size = depth === 1 ? 22 : depth === 2 ? 19 : 16.5;
@@ -227,6 +242,26 @@ function Block({ token }: { token: Token }) {
   }
 }
 
+function ImageBlock({ src, alt }: { src: string; alt: string }) {
+  const onImagePress = useContext(ImagePressContext);
+  if (!src) return null;
+  return (
+    <Pressable
+      onPress={() => onImagePress?.(src)}
+      accessibilityRole="imagebutton"
+      accessibilityLabel={alt}
+      style={styles.imageBlock}
+    >
+      <Image
+        source={{ uri: resolveMarkdownUrl(src) }}
+        style={styles.blockImage}
+        resizeMode="cover"
+        accessibilityLabel={alt}
+      />
+    </Pressable>
+  );
+}
+
 function Inline({ tokens }: { tokens?: Token[] }) {
   const { theme } = useTheme();
   const colors = theme.colors;
@@ -307,7 +342,7 @@ function Inline({ tokens }: { tokens?: Token[] }) {
               >
                 <Image
                   source={{ uri: resolveMarkdownUrl(src) }}
-                  style={[styles.image, { borderColor: colors.border }]}
+                  style={[styles.image, { borderColor: "transparent" }]}
                   resizeMode="contain"
                   accessibilityLabel={alt}
                 />
@@ -560,8 +595,19 @@ const styles = StyleSheet.create({
     width: 260,
     height: 180,
     borderRadius: 10,
-    borderWidth: StyleSheet.hairlineWidth,
     marginVertical: 4,
+  },
+  imageBlock: {
+    // Full-bleed to the left edge: cancels the assistant message's 16pt side
+    // padding so pictures start at the screen edge, without an outline.
+    marginLeft: -16,
+    marginVertical: 8,
+    alignSelf: "flex-start",
+  },
+  blockImage: {
+    width: 260,
+    height: 260,
+    borderRadius: 12,
   },
   blockquote: {
     borderLeftWidth: 2,
