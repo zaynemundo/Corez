@@ -598,9 +598,8 @@ const styles = StyleSheet.create({
     marginVertical: 4,
   },
   imageBlock: {
-    // Full-bleed to the left edge: cancels the assistant message's 16pt side
-    // padding so pictures start at the screen edge, without an outline.
-    marginLeft: -16,
+    // Align with the message copy (the assistant row already pads 16pt), and
+    // keep the card borderless.
     marginVertical: 8,
     alignSelf: "flex-start",
   },
