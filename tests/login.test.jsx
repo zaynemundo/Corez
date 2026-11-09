@@ -81,4 +81,37 @@ describe('Login / Signup Component', () => {
       expect(screen.getByText('Invalid email or password')).toBeTruthy();
     });
   });
+
+  it('jumps straight to the reset form when the worker returns a dev token', async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => {
+      const target = String(url);
+      if (target.includes('/api/auth/me')) {
+        return new Response(JSON.stringify({ error: 'Not authenticated' }), { status: 401 });
+      }
+      if (target.includes('/api/auth/forgot')) {
+        return new Response(
+          JSON.stringify({
+            ok: true,
+            message: 'If that email exists, a reset link has been sent.',
+            token: 'dev_reset_token',
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        );
+      }
+      return new Response(null, { status: 404 });
+    });
+
+    renderLogin();
+
+    fireEvent.click(screen.getByRole('button', { name: /forgot password/i }));
+    fireEvent.change(screen.getByPlaceholderText('you@corez.pro'), {
+      target: { value: 'dev@corez.pro' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /send reset link/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText('Set a new password')).toBeTruthy();
+    });
+    expect(screen.getByPlaceholderText('••••••••')).toBeTruthy();
+  });
 });

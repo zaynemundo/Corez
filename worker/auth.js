@@ -807,13 +807,18 @@ export async function handleAuth(request, env) {
         )
           .bind(id, email, token, expiresAt, Date.now(), user.id)
           .run();
-        const resetUrl = `${url.origin}/?token=${encodeURIComponent(token)}`;
+        const resetUrl = `${url.origin}/login?token=${encodeURIComponent(token)}`;
         // Try to send via Resend if configured, otherwise log
         const resendKey = env?.RESEND_API_KEY;
         if (resendKey) {
           try {
             const from = env?.RESEND_FROM || "CoreZ <onboarding@resend.dev>";
-            await fetch("https://api.resend.com/emails", {
+            if (!env?.RESEND_FROM) {
+              console.warn(
+                "RESEND_FROM is not configured; Resend's sandbox sender can only deliver to the Resend account owner.",
+              );
+            }
+            const resendResponse = await fetch("https://api.resend.com/emails", {
               method: "POST",
               headers: {
                 Authorization: `Bearer ${resendKey}`,
@@ -851,6 +856,19 @@ export async function handleAuth(request, env) {
 </body></html>`,
               }),
             });
+            if (!resendResponse?.ok) {
+              let detail = "";
+              try {
+                detail = String(await resendResponse.text()).slice(0, 300);
+              } catch {
+                /* ignore an unreadable error body */
+              }
+              console.warn(
+                "Resend rejected the reset email:",
+                resendResponse?.status,
+                detail,
+              );
+            }
           } catch (e) {
             console.warn("Resend failed:", safeErrorDetail(e));
           }
@@ -867,7 +885,11 @@ export async function handleAuth(request, env) {
         // let anyone who knows an email take over the account when no email
         // provider is configured. A deployment must opt in explicitly
         // (AUTH_RESET_TOKEN_IN_RESPONSE=1) to include it in the response.
-        if (!resendKey && env.AUTH_RESET_TOKEN_IN_RESPONSE === "1") {
+        if (
+          !resendKey &&
+          (env.AUTH_RESET_TOKEN_IN_RESPONSE === "1" ||
+            env.ENVIRONMENT === "development")
+        ) {
           return jsonResponse(200, {
             ok: true,
             message: "If that email exists, a reset link has been sent.",

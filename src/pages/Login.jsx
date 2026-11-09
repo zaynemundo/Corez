@@ -95,8 +95,12 @@ export default function Login() {
       } else if (mode === "forgot") {
         const res = await forgot(email);
         setForgotSent(res.message || t("auth.forgot.sent"));
-        // In dev without RESEND, token is returned - prefill for testing
-        if (res.token) setResetToken(res.token);
+        // In dev without an email provider the worker returns the token
+        // directly: jump straight to the reset form so the flow is testable.
+        if (res.token) {
+          setResetToken(res.token);
+          setMode("reset");
+        }
       } else if (mode === "reset") {
         await reset(resetToken, newPassword);
         setError("");

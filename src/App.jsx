@@ -915,17 +915,28 @@ function AppInner() {
     );
   }
   if (!user) {
+    // Keep the query string: an older reset email points at "/?token=..." and
+    // the token must survive the redirect to the sign-in screen.
+    const loginTarget = { pathname: "/login", search: location.search };
     return (
       <Routes>
-        <Route path="/" element={<Navigate to="/login" replace />} />
+        <Route path="/" element={<Navigate to={loginTarget} replace />} />
         <Route path="/pricing" element={<Pricing />} />
         <Route path="/login" element={<Login />} />
         <Route path="/payment/success" element={<PaymentSuccess />} />
         <Route path="/share/chat/:token" element={<SharedChat />} />
         {legalRoutes()}
-        <Route path="*" element={<Navigate to="/login" replace />} />
+        <Route path="*" element={<Navigate to={loginTarget} replace />} />
       </Routes>
     );
+  }
+  // A password-reset link must still open the reset form when a session
+  // already exists; otherwise the signed-in route table would bounce it home.
+  if (
+    location.pathname === "/login" &&
+    new URLSearchParams(location.search).has("token")
+  ) {
+    return <Login />;
   }
   return (
     <Routes>

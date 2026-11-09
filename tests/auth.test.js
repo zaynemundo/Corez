@@ -527,6 +527,99 @@ describe('Worker Auth Engine', () => {
       expect(body.resetUrl).toBeUndefined();
     });
 
+    it('emails a reset link that lands on the login route with the token', async () => {
+      mockEnv.DB.users.set('mailreset@corez.pro', {
+        id: 'u_mailreset', email: 'mailreset@corez.pro', password_hash: 'hash',
+        provider: 'local', created_at: Date.now(), plan: 'free'
+      });
+      mockEnv.RESEND_API_KEY = 're_test_key';
+      mockEnv.RESEND_FROM = 'CoreZ <no-reply@corez.pro>';
+      const calls = [];
+      const originalFetch = globalThis.fetch;
+      globalThis.fetch = async (url, init) => {
+        calls.push({ url: String(url), init });
+        return new Response(JSON.stringify({ id: 'email_1' }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      };
+      try {
+        const req = new Request('https://corez.pro/api/auth/forgot', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'CF-Connecting-IP': '10.77.0.1' },
+          body: JSON.stringify({ email: 'mailreset@corez.pro' })
+        });
+        const res = await handleAuth(req, mockEnv);
+        expect(res.status).toBe(200);
+        const body = await res.json();
+        // The secret never rides in the HTTP response when email is configured.
+        expect(body.token).toBeUndefined();
+        expect(body.resetUrl).toBeUndefined();
+
+        expect(calls).toHaveLength(1);
+        expect(calls[0].url).toBe('https://api.resend.com/emails');
+        const payload = JSON.parse(calls[0].init.body);
+        expect(payload.to).toBe('mailreset@corez.pro');
+        expect(payload.from).toBe('CoreZ <no-reply@corez.pro>');
+        // The link used to point at "/?token=..." which the sign-in redirect
+        // dropped; it must go straight to the route that reads the token.
+        expect(payload.html).toContain('https://corez.pro/login?token=');
+        expect(payload.html).not.toContain('https://corez.pro/?token=');
+      } finally {
+        globalThis.fetch = originalFetch;
+      }
+    });
+
+    it('keeps the generic response (and logs) when Resend rejects the email', async () => {
+      mockEnv.DB.users.set('mailfail@corez.pro', {
+        id: 'u_mailfail', email: 'mailfail@corez.pro', password_hash: 'hash',
+        provider: 'local', created_at: Date.now(), plan: 'free'
+      });
+      mockEnv.RESEND_API_KEY = 're_test_key';
+      const originalFetch = globalThis.fetch;
+      const warnings = [];
+      const originalWarn = console.warn;
+      console.warn = (...args) => warnings.push(args.join(' '));
+      globalThis.fetch = async () =>
+        new Response(JSON.stringify({ message: 'domain is not verified' }), {
+          status: 403,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      try {
+        const req = new Request('https://corez.pro/api/auth/forgot', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'CF-Connecting-IP': '10.77.0.2' },
+          body: JSON.stringify({ email: 'mailfail@corez.pro' })
+        });
+        const res = await handleAuth(req, mockEnv);
+        expect(res.status).toBe(200);
+        const body = await res.json();
+        expect(body.token).toBeUndefined();
+        expect(warnings.some((line) => line.includes('Resend rejected the reset email'))).toBe(true);
+      } finally {
+        globalThis.fetch = originalFetch;
+        console.warn = originalWarn;
+      }
+    });
+
+    it('returns the reset token when the environment is explicitly development', async () => {
+      mockEnv.DB.users.set('devenv@corez.pro', {
+        id: 'u_devenv', email: 'devenv@corez.pro', password_hash: 'hash',
+        provider: 'local', created_at: Date.now(), plan: 'free'
+      });
+      mockEnv.ENVIRONMENT = 'development';
+      const req = new Request('https://corez.pro/api/auth/forgot', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'CF-Connecting-IP': '10.77.0.3' },
+        body: JSON.stringify({ email: 'devenv@corez.pro' })
+      });
+      const res = await handleAuth(req, mockEnv);
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(typeof body.token).toBe('string');
+      expect(body.resetUrl).toContain('/login?token=');
+    });
+
     it('returns a password-reset token only with the explicit dev opt-in', async () => {
       mockEnv.DB.users.set('optin@corez.pro', {
         id: 'u_optin', email: 'optin@corez.pro', password_hash: 'hash',
