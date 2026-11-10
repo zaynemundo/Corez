@@ -36,6 +36,7 @@ import { handleSubscriptions } from "./subscriptions.js";
 import { handleAnalytics } from "./analytics.js";
 import { pruneSiteAnalytics } from "./siteAnalytics.js";
 import { handleThemes, pruneThemeProposals } from "./themeRoutes.js";
+import { handleAdmin } from "./adminRoutes.js";
 export { GameRoom } from "./gameRoom.js";
 
 // Per-client AI request rate bound: paid provider tokens are spent on every
@@ -253,6 +254,14 @@ export default {
     ) {
       const themesRes = await handleThemes(request, env);
       if (themesRes) return withDirectAiCors(themesRes);
+    }
+
+    // Operator console (see worker/adminRoutes.js). It authorises itself so an
+    // admin key can work without a browser session; /api/admin/storage-migrate
+    // is left to the normal gate below.
+    if (url.pathname === "/api/admin" || url.pathname.startsWith("/api/admin/")) {
+      const adminRes = await handleAdmin(request, env);
+      if (adminRes) return withDirectAiCors(adminRes);
     }
 
     // Auth gate - protect AI and app APIs. Published creations (/api/publish

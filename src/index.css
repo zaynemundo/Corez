@@ -263,6 +263,7 @@ body {
   /* Full-height standalone routes live directly under #root, so their
      100dvh would become 94.5dvh after the scale. Enlarge them with the root. */
   #root > .shared-chat-page,
+  #root > .admin-page,
   #root > .auth-page {
     height: 105.8201vh;
     height: 105.8201dvh;

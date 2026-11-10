@@ -18,6 +18,7 @@ import SettingsModal from "./components/SettingsModal";
 import ChatShareModal from "./components/ChatShareModal";
 import DropZoneOverlay from "./components/DropZoneOverlay";
 import Login from "./pages/Login";
+import Admin from "./pages/Admin";
 import Sites from "./pages/Sites";
 import { PaymentSuccess } from "./pages/PaymentStatus";
 import Pricing from "./pages/Pricing";
@@ -819,7 +820,7 @@ function MainApp() {
 }
 
 const PUBLIC_ROUTES =
-  /^\/(?:login|pricing|payment\/success|privacy|terms|cookies|refunds|privacy-policy|terms-and-conditions|cookie-policy|refund-policy|share\/chat\/[^/]+)\/?$/;
+  /^\/(?:login|admin|pricing|payment\/success|privacy|terms|cookies|refunds|privacy-policy|terms-and-conditions|cookie-policy|refund-policy|share\/chat\/[^/]+)\/?$/;
 
 function legalRoutes() {
   return [
@@ -923,6 +924,7 @@ function AppInner() {
         <Route path="/" element={<Navigate to={loginTarget} replace />} />
         <Route path="/pricing" element={<Pricing />} />
         <Route path="/login" element={<Login />} />
+        <Route path="/admin" element={<Admin />} />
         <Route path="/payment/success" element={<PaymentSuccess />} />
         <Route path="/share/chat/:token" element={<SharedChat />} />
         {legalRoutes()}
@@ -944,12 +946,21 @@ function AppInner() {
       <Route path="/chat/:chatId" element={<MainApp />} />
       <Route path="/sites" element={<MainApp />} />
       <Route path="/pricing" element={<Pricing />} />
+      <Route path="/admin" element={<Admin />} />
       <Route path="/payment/success" element={<PaymentSuccess />} />
       <Route path="/share/chat/:token" element={<SharedChat />} />
       {legalRoutes()}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
+}
+
+// The operator console is a private internal tool: do not cover it with the
+// public cookie banner.
+function AppCookieConsent() {
+  const location = useLocation();
+  if (location.pathname === "/admin") return null;
+  return <CookieConsent />;
 }
 
 export default function App() {
@@ -959,7 +970,7 @@ export default function App() {
         <ThemeProvider>
           <AppInner />
           <RouteAnalytics />
-          <CookieConsent />
+          <AppCookieConsent />
         </ThemeProvider>
       </AuthProvider>
     </BrowserRouter>
